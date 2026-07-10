@@ -60,7 +60,7 @@ def run_agent(
     user_query: str,
     client: OpenAI,
     model: str = "gpt-4o-mini",
-    max_tool_rounds: int = 8,
+    max_tool_rounds: int = 15,
     verbose: bool = True,
 ) -> dict:
     """运行 Agent 循环：LLM 决策工具 → 调用 → 反馈 → 重复。
