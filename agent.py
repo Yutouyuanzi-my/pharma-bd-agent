@@ -182,10 +182,12 @@ def run_agent(
                     result = json.dumps({"error": str(e)})
 
             # 记录调用轨迹
+            # 剔除不可序列化的对象（如 llm_client），避免 json.dumps 报错
+            trace_args = {k: v for k, v in args.items() if k != "llm_client"}
             trace.append({
                 "turn": turn + 1,
                 "tool": func_name,
-                "arguments": args,
+                "arguments": trace_args,
                 "result_preview": result[:300],
             })
 

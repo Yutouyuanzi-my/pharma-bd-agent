@@ -234,13 +234,21 @@ st.markdown("### 快捷操作")
 # 创建 4 个并排按钮
 col_a, col_b, col_c, col_d = st.columns(4)
 with col_a:
-    preset1 = st.button("📊 NSCLC 竞争格局", use_container_width=True)
+    if st.button("📊 NSCLC 竞争格局", use_container_width=True):
+        st.session_state.preset_query = "分析 NSCLC 的竞争格局，列出主要药企的试验分布"
 with col_b:
-    preset2 = st.button("🔍 AstraZeneca 在做什么", use_container_width=True)
+    if st.button("🔍 AstraZeneca 在做什么", use_container_width=True):
+        st.session_state.preset_query = "AstraZeneca 在 NSCLC 领域有哪些临床试验？各处于什么阶段？"
 with col_c:
-    preset3 = st.button("📅 CAR-T 本周更新", use_container_width=True)
+    if st.button("📅 CAR-T 本周更新", use_container_width=True):
+        st.session_state.preset_query = "过去一周 CAR-T 疗法有什么新的临床试验？请列出新增和更新的试验"
 with col_d:
-    preset4 = st.button("⚖️ 对比两个试验", use_container_width=True)
+    if st.button("⚖️ 对比两个试验", use_container_width=True):
+        st.session_state.preset_query = "帮我对比一下 NCT04267848 和 NCT04191356，从试验设计、入排标准和竞争定位角度分析"
+
+# 初始化 session_state（首次加载时）
+if "preset_query" not in st.session_state:
+    st.session_state.preset_query = ""
 
 # ── 查询输入框 ──
 
@@ -250,24 +258,17 @@ query_placeholder = (
     "或者：帮我看一下这周有哪些新的 CAR-T 临床试验登记了。"
 )
 
-# 根据用户点击的快捷按钮，设置默认查询
-default_query = ""
-if preset1:
-    default_query = "分析 NSCLC 的竞争格局，列出主要药企的试验分布"
-elif preset2:
-    default_query = "AstraZeneca 在 NSCLC 领域有哪些临床试验？各处于什么阶段？"
-elif preset3:
-    default_query = "过去一周 CAR-T 疗法有什么新的临床试验？请列出新增和更新的试验"
-elif preset4:
-    default_query = "帮我对比一下 NCT04267848 和 NCT04191356，从试验设计、入排标准和竞争定位角度分析"
-
-# 文本输入区域（多行）
+# 文本输入区域（多行）：优先使用快捷按钮设置的值
 query = st.text_area(
     "输入你的查询",
-    value=default_query,
+    value=st.session_state.get("preset_query", ""),
     placeholder=query_placeholder,
     height=100,
 )
+
+# 用户手动修改了输入后，清除预设值（避免覆盖用户手写内容）
+if query != st.session_state.get("preset_query", ""):
+    st.session_state.preset_query = ""
 
 # 运行按钮
 col1, col2 = st.columns([1, 5])
