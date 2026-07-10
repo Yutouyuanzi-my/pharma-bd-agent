@@ -115,6 +115,7 @@ def run_agent(
 
     tools = _build_tool_choice_list()
     trace = []
+    consecutive_errors = 0  # 连续错误计数器，防止工具全挂时死循环
 
     # Agent 主循环：最多执行 max_tool_rounds 轮
     for turn in range(max_tool_rounds):
@@ -176,10 +177,34 @@ def run_agent(
                 # 执行工具函数
                 try:
                     raw_result = func(**args)
-                    # 将结果序列化为 JSON，限制长度（避免超出上下文窗口）
-                    result = json.dumps(raw_result, ensure_ascii=False)[:8000]
+                    # 检查工具是否返回了错误
+                    if isinstance(raw_result, dict) and "error" in raw_result:
+                        result = json.dumps(raw_result, ensure_ascii=False)[:8000]
+                        consecutive_errors += 1
+                    else:
+                        # 将结果序列化为 JSON，限制长度（避免超出上下文窗口）
+                        result = json.dumps(raw_result, ensure_ascii=False)[:8000]
+                        consecutive_errors = 0  # 成功，重置计数器
                 except Exception as e:
                     result = json.dumps({"error": str(e)})
+                    consecutive_errors += 1
+
+            # 连续 3 次工具调用都失败 → 提前终止，避免空转
+            if consecutive_errors >= 3:
+                messages.append({
+                    "role": "user",
+                    "content": "[System note: Multiple tool calls failed. Please provide your best response based on available information.]",
+                })
+                # 再给 LLM 一次机会生成最终回复（不带工具）
+                final_resp = client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=0.2,
+                )
+                return {
+                    "final_response": final_resp.choices[0].message.content or "All API calls failed. Unable to complete the analysis.",
+                    "trace": trace,
+                }
 
             # 记录调用轨迹
             # 剔除不可序列化的对象（如 llm_client），避免 json.dumps 报错

@@ -14,6 +14,7 @@ Agent 工具集：ClinicalTrials.gov 竞争情报 + PubMed + 格局分析。
 
 import json
 import re
+import ssl
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -22,6 +23,12 @@ from typing import Optional, Any
 # API 基础 URL
 CLINICAL_TRIALS_BASE = "https://clinicaltrials.gov/api/v2"
 PUBMED_BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+
+# 创建不验证 SSL 证书的 context（国内网络环境常遇到证书链不完整的问题）
+# 生产环境建议换成正确配置的证书；当前为开发演示用途
+_SSL_NO_VERIFY = ssl.create_default_context()
+_SSL_NO_VERIFY.check_hostname = False
+_SSL_NO_VERIFY.verify_mode = ssl.CERT_NONE
 
 
 # ──────────────────────────────────────────────
@@ -101,7 +108,7 @@ def _fetch_studies(url: str) -> dict:
     )
     
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=15, context=_SSL_NO_VERIFY) as resp:
             data = json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         # HTTP 错误（如 429 限流、403 禁止）
@@ -186,7 +193,7 @@ def get_trial_detail(nct_id: str) -> dict:
         url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
     )
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=15, context=_SSL_NO_VERIFY) as resp:
             data = json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         return {"error": f"HTTP {e.code}"}
@@ -226,7 +233,7 @@ def search_pubmed(query: str, max_results: int = 5) -> dict:
     search_url = f"{PUBMED_BASE}/esearch.fcgi?{search_params}"
 
     try:
-        with urllib.request.urlopen(search_url, timeout=10) as resp:
+        with urllib.request.urlopen(search_url, timeout=10, context=_SSL_NO_VERIFY) as resp:
             search_data = json.loads(resp.read().decode())
     except Exception as e:
         return {"error": f"PubMed search failed: {e}"}
@@ -246,7 +253,7 @@ def search_pubmed(query: str, max_results: int = 5) -> dict:
 
     articles = []
     try:
-        with urllib.request.urlopen(fetch_url, timeout=10) as resp:
+        with urllib.request.urlopen(fetch_url, timeout=10, context=_SSL_NO_VERIFY) as resp:
             xml = resp.read().decode("utf-8", errors="replace")
             # 使用正则表达式解析 XML（简单场景，避免引入额外依赖）
             titles = re.findall(r"<ArticleTitle>(.*?)</ArticleTitle>", xml, re.DOTALL)
@@ -475,7 +482,7 @@ def monitor_recent_changes(condition: str, since_days: int = 7) -> dict:
         req = urllib.request.Request(url_new, headers={
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
         })
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=15, context=_SSL_NO_VERIFY) as resp:
             new_data = json.loads(resp.read().decode())
         new_studies = [
             _summarize_study(s.get("protocolSection", {}))
