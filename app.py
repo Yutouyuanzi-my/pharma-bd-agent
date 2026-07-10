@@ -407,16 +407,7 @@ if run_btn:
         # 先将每个 trace step 的完整 result 存入（agent.py 中 result_preview 是截断版）
         st.subheader("📊 数据可视化")
 
-        for step in trace:
-            if step.get("tool") == "analyze_competitive_landscape":
-                try:
-                    data = json.loads(step.get("result_preview", "{}"))
-                    # 尝试解析完整数据（result_preview 可能只有 300 字符，需要更完整的数据）
-                    # 实际上 agent.py 的 trace 中 result_preview 是截断的，所以这里需要另一种方式获取完整数据
-                except:
-                    pass
-
-        # 尝试从 trace 中提取 landscape 数据
+        # 从 trace 中提取 landscape 数据并渲染图表
         for step in trace:
             if step.get("tool") == "analyze_competitive_landscape":
                 try:
@@ -458,7 +449,7 @@ if run_btn:
         for step in trace:
             if step.get("tool") == "search_clinical_trials":
                 try:
-                    raw = step.get("result_preview", "{}")
+                    raw = step.get("_full_result", step.get("result_preview", "{}"))
                     data = json.loads(raw) if isinstance(raw, str) else raw
                 except (json.JSONDecodeError, KeyError):
                     continue
@@ -483,7 +474,7 @@ if run_btn:
         for step in trace:
             if step.get("tool") == "monitor_recent_changes":
                 try:
-                    raw = step.get("result_preview", "{}")
+                    raw = step.get("_full_result", step.get("result_preview", "{}"))
                     data = json.loads(raw) if isinstance(raw, str) else raw
                 except (json.JSONDecodeError, KeyError):
                     continue
@@ -508,7 +499,7 @@ if run_btn:
         for step in trace:
             if step.get("tool") == "search_pubmed":
                 try:
-                    raw = step.get("result_preview", "{}")
+                    raw = step.get("_full_result", step.get("result_preview", "{}"))
                     data = json.loads(raw) if isinstance(raw, str) else raw
                 except (json.JSONDecodeError, KeyError):
                     continue

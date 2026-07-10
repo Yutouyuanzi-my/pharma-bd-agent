@@ -104,7 +104,13 @@ def run_agent(
         "5. Synthesize findings into a clear, structured report (in Chinese if the user writes in Chinese).\n\n"
         "IMPORTANT: Your output should be structured like a BD morning briefing — concise, "
         "actionable, data-driven. Include sponsor names, trial phases, and statuses.\n\n"
-        "Be thorough but concise. Always state your reasoning before calling a tool."
+        "Be thorough but concise. Always state your reasoning before calling a tool.\n\n"
+        "OUTPUT FORMAT:\n"
+        "- When listing trials, include NCT links like https://clinicaltrials.gov/study/NCT04267848\n"
+        "- Use markdown tables for structured data (sponsor comparison, phase distribution)\n"
+        "- Highlight risky events with \u26a0\ufe0f (terminated trials, failed phases, safety concerns)\n"
+        "- End with a brief 'BD Strategy Note' section when applicable\n"
+        "- Output in Chinese unless the user writes in English"
     )
 
     # 初始化消息列表（系统提示 + 用户查询）
@@ -163,6 +169,21 @@ def run_agent(
                 except json.JSONDecodeError:
                     args = {}
 
+                # -- 参数清洗：LLM 有时会在参数值中混入换行、思考标签、多余空格 --
+                for key, val in args.items():
+                    if isinstance(val, str):
+                        val = val.replace("<thinking>", "").replace("</thinking>", "")
+                        val = " ".join(val.split())
+                        args[key] = val.strip()
+                    elif isinstance(val, list):
+                        cleaned = []
+                        for item in val:
+                            if isinstance(item, str):
+                                item = item.replace("<thinking>", "").replace("</thinking>", "")
+                                item = " ".join(item.split()).strip()
+                            cleaned.append(item)
+                        args[key] = cleaned
+
                 func, spec = REGISTRY[func_name]
                 
                 # 为需要 LLM 客户端的工具注入 client
@@ -186,7 +207,16 @@ def run_agent(
                         result = json.dumps(raw_result, ensure_ascii=False)[:8000]
                         consecutive_errors = 0  # 成功，重置计数器
                 except Exception as e:
-                    result = json.dumps({"error": str(e)})
+                    error_msg = str(e)
+                    if "401" in error_msg or "Unauthorized" in error_msg or "Authentication" in error_msg:
+                        friendly = "[凭证错误] API Key 无效或已过期，请在侧边栏检查 API Key 配置"
+                    elif "429" in error_msg or "Rate limit" in error_msg:
+                        friendly = "[限流] API 请求过于频繁，请稍后重试"
+                    elif "timeout" in error_msg.lower() or "timed out" in error_msg.lower():
+                        friendly = "[超时] 接口请求超时，可能是网络环境不稳定，请重试"
+                    else:
+                        friendly = f"[工具调用失败] {error_msg[:200]}"
+                    result = json.dumps({"error": friendly})
                     consecutive_errors += 1
 
             # 连续 3 次工具调用都失败 → 提前终止，避免空转
@@ -213,7 +243,8 @@ def run_agent(
                 "turn": turn + 1,
                 "tool": func_name,
                 "arguments": trace_args,
-                "result_preview": result[:300],
+                "result_preview": result[:500],  # trace 展示用截断版
+                "_full_result": result,  # 完整结果，供前端渲染图表/表格
             })
 
             # 将工具执行结果添加到消息列表（供 LLM 下一轮使用）
