@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 密钥（重要！不要把真实 key 推到 GitHub）
+.env
+
+# 系统文件
+.DS_Store
