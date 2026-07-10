@@ -177,15 +177,15 @@ with st.sidebar:
 
     # API Key：优先用 .env 中的值预填，用户也可在界面手动覆盖
     api_key = st.text_input(
-        "API Key (OpenAI / DeepSeek)",
+        "DeepSeek API Key",
         type="password",
-        value=os.getenv("OPENAI_API_KEY", ""),
-        help="支持 OpenAI 及任何兼容 OpenAI 协议的端点（如 DeepSeek）。也可在 .env 中配置。",
+        value=os.getenv("DEEPSEEK_API_KEY", ""),
+        help="支持 DeepSeek 及任何兼容 OpenAI 协议的端点（例如 OpenAI 留空 Base URL 即可）。也可在 .env 中配置。",
     )
 
-    # 模型选择：内置常见 OpenAI 模型，并额外支持自定义（DeepSeek 为 deepseek-chat）
-    MODEL_CHOICES = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "deepseek-chat"]
-    env_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    # 模型选择：内置常见模型，并额外支持自定义（DeepSeek 为 deepseek-chat）
+    MODEL_CHOICES = ["deepseek-chat", "gpt-4o-mini", "gpt-4o", "gpt-4-turbo"]
+    env_model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
     if env_model and env_model not in MODEL_CHOICES:
         MODEL_CHOICES = MODEL_CHOICES + [env_model]
     try:
@@ -207,7 +207,7 @@ with st.sidebar:
     # 自定义 API Base URL：用于 DeepSeek 等兼容端点
     base_url = st.text_input(
         "API Base URL（可选，自定义端点用）",
-        value=os.getenv("OPENAI_BASE_URL", ""),
+        value=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
         help="DeepSeek 填 https://api.deepseek.com ；留空则用 OpenAI 官方端点",
     )
 

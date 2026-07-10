@@ -28,7 +28,7 @@ flowchart LR
     A --> LLM[LLM<br/>OpenAI / DeepSeek]
     LLM -->|base_url 可切换端点| EP[API 端点]
 ```
-> 纯 OpenAI function-calling 实现，无 Agent 框架依赖；通过 `OPENAI_BASE_URL` 兼容任意 OpenAI 协议端点。
+> 纯 function-calling 实现，无 Agent 框架依赖；通过 `DEEPSEEK_BASE_URL` 兼容任意 OpenAI 协议端点（默认 DeepSeek）。
 
 ### Tools
 
@@ -65,7 +65,7 @@ Return structured report (in Chinese or English)
 | **ClinicalTrials.gov v2 advanced query** | Supports `AREA[Sponsor]` and `AREA[LastUpdatePostDate]RANGE` for sponsor filtering and time-based monitoring. |
 | **Chinese output support** | The target users (Chinese pharma BD) operate in Chinese. Agent outputs in the user's language. |
 | **Streamlit frontend** | Fast iteration, deployable to Streamlit Cloud for free. Preset buttons for common BD queries. |
-| **Multi-model (OpenAI / DeepSeek)** | 通过 `.env` 配置 `OPENAI_BASE_URL` + `OPENAI_MODEL`，兼容 DeepSeek 等任意 OpenAI 协议端点；tool-calling 循环默认 gpt-4o-mini 控制成本。 |
+| **Multi-model (DeepSeek / OpenAI 兼容)** | 通过 `.env` 配置 `DEEPSEEK_BASE_URL` + `DEEPSEEK_MODEL`，兼容任意 OpenAI 协议端点；默认 deepseek-chat。 |
 
 ## Quick Start
 
@@ -75,14 +75,14 @@ pip install -r requirements.txt
 ```
 
 ### 2. 配置 API Key（二选一）
-- **方式 A（推荐）**：复制 `.env.example` 为 `.env`，填入 `OPENAI_API_KEY`
+- **方式 A（推荐）**：复制 `.env.example` 为 `.env`，填入 `DEEPSEEK_API_KEY`
 - **方式 B**：直接在 Streamlit 侧边栏输入 API Key（仅当前会话，不保存）
 
 ### 3. （可选）使用 DeepSeek 等兼容端点
 在 `.env` 中设置：
 ```
-OPENAI_BASE_URL=https://api.deepseek.com
-OPENAI_MODEL=deepseek-chat
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-chat
 ```
 界面侧边栏同样支持手动填写 Base URL 与自定义模型名，无需改代码。
 
