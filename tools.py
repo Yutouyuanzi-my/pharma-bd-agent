@@ -14,21 +14,32 @@ Agent 工具集：ClinicalTrials.gov 竞争情报 + PubMed + 格局分析。
 
 import json
 import re
-import ssl
-import urllib.request
-import urllib.error
 import urllib.parse
+from datetime import datetime, timedelta
 from typing import Optional, Any
+
+import requests
+import urllib3
+
+# 屏蔽 requests 关闭验证时的控制台警告（国内网络开发用）
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # API 基础 URL
 CLINICAL_TRIALS_BASE = "https://clinicaltrials.gov/api/v2"
 PUBMED_BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
-# 创建不验证 SSL 证书的 context（国内网络环境常遇到证书链不完整的问题）
-# 生产环境建议换成正确配置的证书；当前为开发演示用途
-_SSL_NO_VERIFY = ssl.create_default_context()
-_SSL_NO_VERIFY.check_hostname = False
-_SSL_NO_VERIFY.verify_mode = ssl.CERT_NONE
+# 默认请求头（模拟浏览器，绕过 WAF）
+# urllib 的 TLS 指纹会被 ClinicalTrials.gov WAF 识别拦截（403），
+# 用 requests 库配合完整请求头可以正常通过。
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/125.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+}
 
 
 # ──────────────────────────────────────────────
@@ -43,100 +54,94 @@ def search_clinical_trials(
     format: str = "json",
 ) -> dict:
     """按疾病、公司/申办方、状态搜索 ClinicalTrials.gov。
-    
-    当提供申办方时，使用高级查询语法按主要申办方过滤。
+
+    v2 API 移除了 `query.adv`（AREA[Sponsor] 语法），
+    改用 `filter` 参数 + Python 端后过滤。
+
     非常适合 BD 使用场景："Roche 在 NSCLC 领域在做什么？"
-    
+
     Args:
         query: 疾病或条件关键词（如 "NSCLC", "CAR-T"）
         sponsor: 申办方/公司名称（如 "Roche", "AstraZeneca"）
         status: 试验状态过滤（如 "RECRUITING", "ACTIVE_NOT_RECRUITING"）
         page_size: 返回结果数量（最大 20）
         format: 返回格式（默认 "json"）
-        
+
     Returns:
         dict: 包含 total_count 和 studies 列表的字典
     """
-    # 如果提供了申办方或状态，使用高级查询语法
-    if sponsor or status:
-        # 构建高级查询：按条件、申办方、状态过滤
-        adv_parts = [f'AREA[Condition]:"{query}"']
-        if sponsor:
-            adv_parts.append(f'AREA[Sponsor]:"{sponsor}"')
-        if status:
-            adv_parts.append(f'AREA[OverallStatus]:"{status}"')
-        adv_query = " AND ".join(adv_parts)
-        
-        # 构建请求 URL（高级查询）
-        params = urllib.parse.urlencode({
-            "query.adv": adv_query,
-            "pageSize": str(page_size),
-            "format": format,
-        })
-        url = f"{CLINICAL_TRIALS_BASE}/studies?{params}"
-    else:
-        # 使用简单关键词搜索
-        params = urllib.parse.urlencode({
-            "query.term": query,
-            "pageSize": str(page_size),
-            "format": format,
-        })
-        url = f"{CLINICAL_TRIALS_BASE}/studies?{params}"
+    # v2 API 支持 filter.overallStatus，但不支持 sponsor 和高级 Area 查询了
+    # 策略：用 query.term 做全文搜索，然后在 Python 端按 sponsor/status 过滤
+    # 将 sponsor 和 status 嵌入 query.term 以提高 API 层面的召回率
+    term_parts = [query]
+    if sponsor:
+        term_parts.append(sponsor)
+    if status:
+        # status 字段在全文索引中，拼进去提高初始命中率
+        term_parts.append(status.lower())
+    params = {
+        "query.term": " ".join(term_parts),
+        "pageSize": str(min(page_size * 5, 100)),  # 放宽 pageSize 留出后过滤空间
+        "format": format,
+    }
 
-    return _fetch_studies(url)
+    url = f"{CLINICAL_TRIALS_BASE}/studies?" + urllib.parse.urlencode(params)
+    result = _fetch_studies(url)
+
+    if "error" in result:
+        return result
+
+    studies = result.get("studies", [])
+
+    # 按 sponsor 后过滤（v2 API 不支持 sponsor 过滤参数）
+    if sponsor:
+        sponsor_lower = sponsor.strip().lower()
+        studies = [
+            s for s in studies
+            if sponsor_lower in (s.get("sponsor") or "").lower()
+        ]
+
+    # 按 status 后过滤
+    if status:
+        status_lower = status.strip().lower()
+        studies = [
+            s for s in studies
+            if (s.get("overall_status") or "").lower() == status_lower
+        ]
+
+    return {
+        "total_count": len(studies),
+        "studies": studies[:page_size],
+    }
 
 
 def _fetch_studies(url: str) -> dict:
-    """内部函数：从 URL 获取并汇总试验列表。
-    
-    Args:
-        url: ClinicalTrials.gov API 的完整 URL
-        
-    Returns:
-        dict: 包含 total_count 和 studies 列表的字典
-    """
-    # 构建请求（设置 User-Agent 以避免被 WAF 拦截）
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": (
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/125.0.0.0 Safari/537.36"
-            )
-        },
-    )
-    
+    """内部函数：从 URL 获取并汇总试验列表。"""
     try:
-        with urllib.request.urlopen(req, timeout=15, context=_SSL_NO_VERIFY) as resp:
-            data = json.loads(resp.read().decode())
-    except urllib.error.HTTPError as e:
-        # HTTP 错误（如 429 限流、403 禁止）
-        body = e.read().decode()
-        return {"error": f"HTTP {e.code}: {body[:300]}"}
+        resp = requests.get(url, headers=_HEADERS, timeout=15, verify=False)
+        resp.raise_for_status()
+        data = resp.json()
+    except requests.exceptions.HTTPError as e:
+        return {"error": f"HTTP {e.response.status_code}: {e.response.text[:300]}"}
     except Exception as e:
-        # 其他异常（如网络超时）
         return {"error": str(e)}
 
-    # 汇总每个试验的关键信息
+    studies = data.get("studies", [])
     return {
-        "total_count": data.get("totalCount", 0),
-        "studies": [
-            _summarize_study(s.get("protocolSection", {}))
-            for s in data.get("studies", [])
-        ],
+        "total_count": len(studies),
+        "studies": [_summarize_study(s.get("protocolSection", {})) for s in studies],
     }
 
 
 def _summarize_study(ps: dict) -> dict:
     """从试验的 protocolSection 中提取关键信息。
-    
+
     将 ClinicalTrials.gov API 返回的完整协议数据精简为
     BD 分析师需要的核心字段。
-    
+
     Args:
         ps: protocolSection 字典（API 返回的原始数据）
-        
+
     Returns:
         dict: 包含关键信息的精简字典
     """
@@ -170,8 +175,8 @@ def _summarize_study(ps: dict) -> dict:
         "minimum_age": elig_mod.get("minimumAge", ""),  # 最小年龄
         "maximum_age": elig_mod.get("maximumAge", ""),  # 最大年龄
         "healthy_volunteers": elig_mod.get("healthyVolunteers", ""),  # 是否接受健康志愿者
-        "last_update_post_date": stat_mod.get("lastUpdatePostDate", ""),  # 最后更新发布日期
-        "study_first_post_date": stat_mod.get("studyFirstPostDate", ""),  # 首次发布日期
+        "last_update_post_date": (stat_mod.get("lastUpdatePostDateStruct") or {}).get("date", ""),  # 最后更新发布日期
+        "study_first_post_date": (stat_mod.get("studyFirstPostDateStruct") or {}).get("date", ""),  # 首次发布日期
     }
 
 
@@ -181,22 +186,20 @@ def _summarize_study(ps: dict) -> dict:
 
 def get_trial_detail(nct_id: str) -> dict:
     """根据 NCT ID 获取单个试验的完整协议。
-    
+
     Args:
         nct_id: NCT 编号（如 "NCT04267848"）
-        
+
     Returns:
         dict: 包含试验详细信息的字典
     """
     url = f"{CLINICAL_TRIALS_BASE}/studies/{nct_id}?format=json"
-    req = urllib.request.Request(
-        url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
-    )
     try:
-        with urllib.request.urlopen(req, timeout=15, context=_SSL_NO_VERIFY) as resp:
-            data = json.loads(resp.read().decode())
-    except urllib.error.HTTPError as e:
-        return {"error": f"HTTP {e.code}"}
+        resp = requests.get(url, headers=_HEADERS, timeout=15, verify=False)
+        resp.raise_for_status()
+        data = resp.json()
+    except requests.exceptions.HTTPError as e:
+        return {"error": f"HTTP {e.response.status_code}"}
     except Exception as e:
         return {"error": str(e)}
 
@@ -210,15 +213,15 @@ def get_trial_detail(nct_id: str) -> dict:
 
 def search_pubmed(query: str, max_results: int = 5) -> dict:
     """搜索 PubMed 获取某个主题的科学文献。
-    
+
     使用 NCBI E-utilities API：
     1. 先用 esearch 搜索 PMID 列表
     2. 再用 efetch 获取摘要详情
-    
+
     Args:
         query: PubMed 搜索查询
         max_results: 最大返回文章数
-        
+
     Returns:
         dict: 包含 articles 列表的字典
     """
@@ -233,8 +236,9 @@ def search_pubmed(query: str, max_results: int = 5) -> dict:
     search_url = f"{PUBMED_BASE}/esearch.fcgi?{search_params}"
 
     try:
-        with urllib.request.urlopen(search_url, timeout=10, context=_SSL_NO_VERIFY) as resp:
-            search_data = json.loads(resp.read().decode())
+        resp = requests.get(search_url, headers=_HEADERS, timeout=15, verify=False)
+        resp.raise_for_status()
+        search_data = resp.json()
     except Exception as e:
         return {"error": f"PubMed search failed: {e}"}
 
@@ -253,18 +257,19 @@ def search_pubmed(query: str, max_results: int = 5) -> dict:
 
     articles = []
     try:
-        with urllib.request.urlopen(fetch_url, timeout=10, context=_SSL_NO_VERIFY) as resp:
-            xml = resp.read().decode("utf-8", errors="replace")
-            # 使用正则表达式解析 XML（简单场景，避免引入额外依赖）
-            titles = re.findall(r"<ArticleTitle>(.*?)</ArticleTitle>", xml, re.DOTALL)
-            abstracts = re.findall(r"<AbstractText>(.*?)</AbstractText>", xml, re.DOTALL)
-            for i, title in enumerate(titles):
-                abstract = abstracts[i] if i < len(abstracts) else ""
-                articles.append({
-                    "title": title.strip(),
-                    "abstract": abstract.strip()[:500],  # 截断摘要
-                    "pmid": id_list[i] if i < len(id_list) else "",
-                })
+        resp = requests.get(fetch_url, headers=_HEADERS, timeout=15, verify=False)
+        resp.raise_for_status()
+        xml = resp.text
+        # 使用正则表达式解析 XML（简单场景，避免引入额外依赖）
+        titles = re.findall(r"<ArticleTitle>(.*?)</ArticleTitle>", xml, re.DOTALL)
+        abstracts = re.findall(r"<AbstractText>(.*?)</AbstractText>", xml, re.DOTALL)
+        for i, title in enumerate(titles):
+            abstract = abstracts[i] if i < len(abstracts) else ""
+            articles.append({
+                "title": title.strip(),
+                "abstract": abstract.strip()[:500],  # 截断摘要
+                "pmid": id_list[i] if i < len(id_list) else "",
+            })
     except Exception as e:
         return {"error": f"PubMed fetch failed: {e}", "articles": articles}
 
@@ -282,19 +287,19 @@ def analyze_competitive_landscape(
     model: str = "gpt-4o-mini",
 ) -> dict:
     """分析某个治疗领域的竞争格局。
-    
+
     搜索试验，按申办方、阶段、机制分组，然后生成
     结构化的竞争情报报告。这是让 BD 分析师的每日监测
     真正有用的工具。
-    
+
     当提供特定申办方时，还会突出显示他们与竞争对手的对比位置。
-    
+
     Args:
         condition: 治疗领域或疾病条件（如 "NSCLC"）
         sponsor: 可选，特定申办方（用于分析该申办方的竞争地位）
         llm_client: OpenAI 客户端（用于生成 LLM 总结）
         model: 使用的 LLM 模型
-        
+
     Returns:
         dict: 包含格局分析数据的字典
     """
@@ -433,78 +438,63 @@ Provide a concise competitive landscape summary in Chinese. Cover:
 
 def monitor_recent_changes(condition: str, since_days: int = 7) -> dict:
     """查找最近 N 天内新增或更新的试验。
-    
+
+    v2 API 移除了 `AREA[LastUpdatePostDate]RANGE` 语法，
+    改为搜索后按日期字段在 Python 端过滤。
+
     这是"每日监测"功能的核心 —— 正是 BD 分析师
     每天早上需要检查的内容。同时检查新发布的试验和最近更新的试验。
-    
+
     Args:
         condition: 要监测的治疗领域或疾病条件
         since_days: 回溯天数（默认 7 天，即每周监测；1 天为每日监测）
-        
+
     Returns:
         dict: 包含新增和更新试验列表的字典
     """
-    from datetime import datetime, timedelta
+    # 计算起始日期
+    since_date = datetime.now() - timedelta(days=since_days)
 
-    # 计算起始日期（MM/DD/YYYY 格式）
-    since_date = (datetime.now() - timedelta(days=since_days)).strftime("%m/%d/%Y")
-
-    # 查询 1：更新的试验（按 LastUpdatePostDate 过滤）
-    adv_query = (
-        f'AREA[Condition]:"{condition}" '
-        f'AND AREA[LastUpdatePostDate]RANGE[{since_date},MAX]'
-    )
+    # 用更大的 pageSize 搜，然后后过滤
     params = urllib.parse.urlencode({
-        "query.adv": adv_query,
-        "pageSize": "50",
+        "query.term": condition,
+        "pageSize": "100",
         "format": "json",
-        "sort": "LastUpdatePostDate",  # 按更新日期排序
+        "sort": "LastUpdatePostDate",
     })
     url = f"{CLINICAL_TRIALS_BASE}/studies?{params}"
 
     results = _fetch_studies(url)
-    updated_studies = results.get("studies", []) if "error" not in results else []
+    if "error" in results:
+        return results
 
-    # 查询 2：新发布的试验（按 StudyFirstPostDate 过滤）
-    adv_query_new = (
-        f'AREA[Condition]:"{condition}" '
-        f'AND AREA[StudyFirstPostDate]RANGE[{since_date},MAX]'
-    )
-    params_new = urllib.parse.urlencode({
-        "query.adv": adv_query_new,
-        "pageSize": "20",
-        "format": "json",
-    })
-    url_new = f"{CLINICAL_TRIALS_BASE}/studies?{params_new}"
+    all_studies = results.get("studies", [])
 
-    new_studies = []
-    try:
-        req = urllib.request.Request(url_new, headers={
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
-        })
-        with urllib.request.urlopen(req, timeout=15, context=_SSL_NO_VERIFY) as resp:
-            new_data = json.loads(resp.read().decode())
-        new_studies = [
-            _summarize_study(s.get("protocolSection", {}))
-            for s in new_data.get("studies", [])
-        ]
-    except Exception:
-        pass  # 忽略错误（新发布试验查询是可选的）
-
-    # 去重（一个试验可能同时出现在两个查询结果中）
-    seen_ncts = set()
-    all_studies = []
-    for s in updated_studies + new_studies:
-        if s["nct_id"] not in seen_ncts:
-            seen_ncts.add(s["nct_id"])
-            all_studies.append(s)
+    # 在 Python 端按日期过滤
+    filtered = []
+    for s in all_studies:
+        # 检查最后更新日期
+        update_str = s.get("last_update_post_date", "")
+        first_str = s.get("study_first_post_date", "")
+        matched = False
+        for date_str in [update_str, first_str]:
+            if date_str:
+                try:
+                    d = datetime.strptime(date_str, "%Y-%m-%d")
+                    if d >= since_date:
+                        matched = True
+                        break
+                except ValueError:
+                    pass
+        if matched:
+            filtered.append(s)
 
     return {
         "condition": condition,
-        "since_date": since_date,
+        "since_date": since_date.strftime("%Y-%m-%d"),
         "since_days": since_days,
-        "new_and_updated_count": len(all_studies),
-        "studies": all_studies,
+        "new_and_updated_count": len(filtered),
+        "studies": filtered,
     }
 
 
@@ -518,14 +508,14 @@ def compare_trials_side_by_side(
     model: str = "gpt-4o-mini",
 ) -> dict:
     """并排对比多个试验 —— 申办方、阶段、设计、结果。
-    
+
     对于评估要密切关注哪些竞争对手试验的 BD 团队来说非常重要。
-    
+
     Args:
         nct_ids: NCT ID 列表（最多 5 个）
         llm_client: OpenAI 客户端（用于生成 LLM 对比分析）
         model: 使用的 LLM 模型
-        
+
     Returns:
         dict: 包含试验对比数据的字典
     """
