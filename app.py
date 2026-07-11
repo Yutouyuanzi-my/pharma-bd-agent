@@ -1,16 +1,18 @@
 """
-药企 BD 竞争情报 Agent 的 Streamlit 前端界面。
+药企 BD 竞争情报 Agent —— 三栏轻量化后台 Dashboard。
+
+布局：左导航侧边栏 + 中间核心数据看板 + 右侧业务快捷栏
+配色：极简浅灰白基底 + 暖橙主色 + 莫兰迪柔和色系（现代简约商务风）
 
 运行方式：streamlit run app.py
-
-这个文件负责：
-1. 注册所有可用工具（供 Agent 调用）
-2. 渲染 Streamlit UI（输入框、筛选面板、图表、结果展示）
-3. 处理用户交互（点击按钮、输入查询、调用 Agent）
 """
 
 import os
+import re
 import json
+from datetime import datetime, timedelta
+from collections import Counter
+
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -25,11 +27,15 @@ from tools import (
     compare_trials_side_by_side,
     search_chinese_pipeline,
     search_cde_approvals,
+    _CHINESE_SPONSOR_PATTERNS,
 )
 from agent import register_tool, run_agent
+from openai import OpenAI
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 
-# ── 工具注册 ──
-
+# ── 工具注册（供 智能助手 的 Agent 调用）──
 register_tool("search_clinical_trials", search_clinical_trials, {
     "description": "Search ClinicalTrials.gov by condition, sponsor/company, and status.",
     "parameters": {
@@ -47,9 +53,7 @@ register_tool("get_trial_detail", get_trial_detail, {
     "description": "Get full protocol details for a specific study by NCT ID.",
     "parameters": {
         "type": "object",
-        "properties": {
-            "nct_id": {"type": "string", "description": "NCT ID like 'NCT04267848'"},
-        },
+        "properties": {"nct_id": {"type": "string", "description": "NCT ID like 'NCT04267848'"}},
         "required": ["nct_id"],
     },
 })
@@ -97,7 +101,7 @@ register_tool("search_pubmed", search_pubmed, {
     },
 })
 register_tool("search_chinese_pipeline", search_chinese_pipeline, {
-    "description": "Search Chinese pharma company pipeline trials on ClinicalTrials.gov. Filters for Chinese sponsors like BeiGene, Hengrui, Innovent, etc.",
+    "description": "Search Chinese pharma company pipeline trials on ClinicalTrials.gov. Filters for Chinese sponsors.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -109,7 +113,7 @@ register_tool("search_chinese_pipeline", search_chinese_pipeline, {
     },
 })
 register_tool("search_cde_approvals", search_cde_approvals, {
-    "description": "Query CDE (China Center for Drug Evaluation) drug approval pipeline. Provides links to CDE data platform and related Chinese trial info.",
+    "description": "Query CDE (China Center for Drug Evaluation) drug approval pipeline. Provides links and related Chinese trial info.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -120,303 +124,481 @@ register_tool("search_cde_approvals", search_cde_approvals, {
     },
 })
 
+# ── 客户端 ──
+MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+client = OpenAI(api_key=os.getenv("DEEPSEEK_API_KEY"), base_url=os.getenv("DEEPSEEK_BASE_URL"))
 
-# ── 页面配置 ──
+# ── 主题 ──
+MORANDI = ["#d98841", "#a7b3a0", "#9bb0bd", "#cfa3a3", "#d8c3a5", "#b3a7b3", "#9bb0a8", "#c9b8a8"]
 
-st.set_page_config(page_title="Pharma BD Intelligence Agent", page_icon="🏢", layout="wide")
-st.title("🏢 Pharma BD Competitive Intelligence Agent")
-st.markdown(
-    "Monitor competitor pipelines, analyze clinical trial landscapes, and get daily briefings — "
-    "all powered by an AI agent that searches ClinicalTrials.gov and PubMed."
-)
+CSS = """
+<style>
+[data-testid="stAppViewContainer"] { background:#f4f1ec; }
+[data-testid="stSidebar"] { background:#ffffff; border-right:0.5px solid #e8e3db; }
+[data-testid="stMetric"] { background:#ffffff; border:0.5px solid #e8e3db; border-radius:12px; padding:10px 14px; }
+.viewhead { margin-bottom:14px; }
+.viewhead h1 { font-size:22px; font-weight:700; color:#3d3a36; margin:0 0 2px; }
+.viewhead .sub { font-size:12px; color:#a39c92; }
+.navbrand { font-size:15px; font-weight:700; color:#3d3a36; padding:6px 4px 14px; line-height:1.3; }
+.navbrand span { font-size:11px; font-weight:400; color:#a39c92; }
+.righthead { font-size:14px; font-weight:700; color:#3d3a36; margin-bottom:10px; }
+.rlabel { font-size:11px; color:#a39c92; margin:14px 0 6px; }
+.rhint, .rhist { font-size:12px; color:#8a847b; padding:3px 0; }
+.trow { display:flex; gap:10px; padding:10px 4px; border-bottom:0.5px solid #ece8e0; align-items:flex-start; }
+.trow .dot { width:8px; height:8px; border-radius:50%; margin-top:5px; flex:0 0 auto; }
+.tmain a { color:#3d3a36; font-size:13px; font-weight:600; text-decoration:none; }
+.tmain a:hover { color:#d98841; }
+.tmeta { font-size:11px; color:#a39c92; margin-top:3px; }
+.chip { display:inline-block; background:#fbeede; color:#9a5f2a; font-size:10px; padding:1px 7px; border-radius:10px; margin-left:6px; }
+.stButton>button { border-radius:8px; }
+</style>
+"""
+
+st.set_page_config(page_title="药企 BD 竞品监测", page_icon="🏢", layout="wide")
+st.markdown(CSS, unsafe_allow_html=True)
 
 
-# ── 辅助渲染函数 ──
+# ── session 默认值 ──
+for _k, _v in {
+    "nav": "总览",
+    "preset_query": "",
+    "watchlist": [],
+    "recent": [],
+    "ov_cond": "",
+    "overview_data": None,
+    "landscape_data": None,
+    "search_res": None,
+    "monitor_data": None,
+    "compare_data": None,
+    "china_data": None,
+    "cde_data": None,
+    "assistant_result": None,
+}.items():
+    if _k not in st.session_state:
+        st.session_state[_k] = _v
 
-def _render_trial_table(studies: list[dict], title: str = "临床试验") -> str:
-    """将试验列表渲染为 Markdown 表格（含原文链接和风险标签）。"""
-    if not studies:
-        return ""
-    rows = ["| NCT ID | 标题 | 申办方 | 阶段 | 状态 | 标签 |", "|---|---|---|---|---|---|"]
+
+# ── 辅助函数 ──
+def _is_chinese(sponsor: str) -> bool:
+    sp = (sponsor or "").lower()
+    return any(p.lower() in sp for p in _CHINESE_SPONSOR_PATTERNS)
+
+
+def _risk_color(tags):
+    if any("终止" in t or "安全" in t for t in tags):
+        return "#c97b6e"
+    if any(("突破性" in t or "招募" in t or "Phase 2 完成" in t or "First" in t) for t in tags):
+        return "#7a9b6e"
+    return "#9bb0bd"
+
+
+def _push_recent(q: str):
+    if q and q not in st.session_state.recent:
+        st.session_state.recent.append(q)
+        st.session_state.recent = st.session_state.recent[-10:]
+
+
+def _add_watch(w: str):
+    if w and w not in st.session_state.watchlist:
+        st.session_state.watchlist.append(w)
+
+
+def _linkify(text: str) -> str:
+    text = re.sub(r"(?<!\[)(NCT\d{8})(?!\])", r"[\1](https://clinicaltrials.gov/study/\1)", text)
+    text = re.sub(r"(?<!\[)(\b\d{8}\b)(?!\])", r"[\1](https://pubmed.ncbi.nlm.nih.gov/\1/)", text)
+    return text
+
+
+def _chart(fig):
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="-apple-system, 'PingFang SC', sans-serif", size=12, color="#3d3a36"),
+        margin=dict(l=12, r=12, t=12, b=12),
+        xaxis=dict(gridcolor="#ece8e0", zeroline=False),
+        yaxis=dict(gridcolor="#ece8e0", zeroline=False),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def _trial_row(s: dict):
+    nct = s.get("nct_id", "")
+    link = s.get("nct_link", f"https://clinicaltrials.gov/study/{nct}")
+    # 兼容两种字段命名：完整 study（brief_title/overall_status）与精简 trial（title/status）
+    title = (s.get("brief_title") or s.get("title") or "")[:72]
+    status = s.get("overall_status") or s.get("status") or ""
+    phase = s.get("phase", "") or "-"
+    date = s.get("last_update_post_date") or s.get("study_first_post_date") or ""
+    tags = s.get("risk_tags", []) or []
+    chip = "".join(f'<span class="chip">{t}</span>' for t in tags)
+    col = _risk_color(tags)
+    html = (
+        f'<div class="trow"><span class="dot" style="background:{col}"></span>'
+        f'<div class="tmain"><a href="{link}" target="_blank">{title}</a>'
+        f'<div class="tmeta">{nct} · {phase} · {status} · {date}{chip}</div></div></div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def _viewhead(title, sub):
+    return f'<div class="viewhead"><h1>{title}</h1><div class="sub">{sub}</div></div>'
+
+
+# ── 各视图渲染 ──
+def render_overview():
+    st.markdown(_viewhead("总览", "一键聚合治疗领域的试验规模、竞争格局与近期动态"))
+    cond = st.text_input("监测主题（治疗领域 / 靶点）", value=st.session_state.ov_cond,
+                         key="ov_input", placeholder="如 NSCLC, PD-1, CAR-T")
+    if st.button("生成看板", type="primary", key="ov_btn"):
+        if not cond.strip():
+            st.error("请输入监测主题")
+        else:
+            with st.spinner("聚合临床试验数据..."):
+                landscape = analyze_competitive_landscape(cond.strip())
+                recent = monitor_recent_changes(cond.strip(), since_days=30)
+            st.session_state.overview_data = {"landscape": landscape, "recent": recent, "cond": cond.strip()}
+            st.session_state.ov_cond = cond.strip()
+            _push_recent(cond.strip())
+    data = st.session_state.overview_data
+    if not data:
+        st.info("输入监测主题并点击「生成看板」生成数据看板。")
+        return
+    landscape, recent = data["landscape"], data["recent"]
+    if "error" in landscape:
+        st.error(landscape["error"])
+        return
+
+    studies = [s for s in recent.get("studies", [])] if "error" not in recent else []
+    cutoff = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    week = [s for s in studies if (s.get("last_update_post_date") or s.get("study_first_post_date") or "") >= cutoff]
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("总试验", landscape.get("total_trials", 0))
+    c2.metric("活跃试验", landscape.get("active_trials", 0))
+    c3.metric("近30天新增", len(studies))
+    c4.metric("本周新增", len(week))
+
+    top = landscape.get("top_sponsors", [])
+    if top:
+        df = pd.DataFrame([{"申办方": t["sponsor"][:14], "试验数": t["trial_count"]} for t in top]).sort_values("试验数")
+        _chart(px.bar(df, x="试验数", y="申办方", orientation="h", color_discrete_sequence=["#d98841"]))
+
+    pd_ = landscape.get("phase_distribution", {})
+    phases = {p: len(v) for p, v in pd_.items() if v}
+    if phases:
+        dfp = pd.DataFrame([{"阶段": k, "试验数": v} for k, v in phases.items()])
+        _chart(px.bar(dfp, x="阶段", y="试验数", color="阶段", color_discrete_sequence=MORANDI))
+
+    if studies:
+        dates = [ (s.get("last_update_post_date") or s.get("study_first_post_date") or "")[:10] for s in studies ]
+        dates = [d for d in dates if d]
+        if dates:
+            cnt = Counter(dates)
+            sd = sorted(cnt.keys())
+            fig = go.Figure(go.Scatter(x=sd, y=[cnt[d] for d in sd], mode="lines+markers",
+                                       line=dict(color="#d98841", width=2), fill="tozeroy",
+                                       fillcolor="rgba(217,136,65,0.12)"))
+            _chart(fig)
+
+    st.markdown("### 近期重要更新")
     for s in studies[:10]:
-        nct = s.get("nct_id", "")
-        link = s.get("nct_link", f"https://clinicaltrials.gov/study/{nct}")
-        title_text = s.get("brief_title", "")[:60]
-        sponsor = s.get("sponsor", "")[:20]
-        phase = s.get("phase", "") or "-"
-        status = s.get("overall_status", "") or "-"
-        tags = ", ".join(s.get("risk_tags", [])) or "-"
-        rows.append(f"| [{nct}]({link}) | {title_text} | {sponsor} | {phase} | {status} | {tags} |")
-    return "\n".join(rows)
+        _trial_row(s)
+
+    if st.button("★ 加入我的监测", key="ov_watch"):
+        _add_watch(data["cond"])
 
 
-def _render_pubmed_table(articles: list[dict]) -> str:
-    """将文献列表渲染为 Markdown 表格。"""
-    if not articles:
-        return ""
-    rows = ["| PMID | 标题 | 摘要 |", "|---|---|---|"]
-    for a in articles[:5]:
-        pmid = a.get("pmid", "")
-        link = a.get("pubmed_link", f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/")
-        title = a.get("title", "")[:60]
-        abstract = a.get("abstract", "")[:100].replace("\n", " ")
-        rows.append(f"| [{pmid}]({link}) | {title} | {abstract} |")
-    return "\n".join(rows)
+def render_landscape():
+    st.markdown(_viewhead("竞争格局", "分析治疗领域的竞争密度：主要玩家与阶段分布"))
+    cond = st.text_input("治疗领域", value=st.session_state.ov_cond, key="l_cond")
+    sponsor = st.text_input("聚焦申办方（可选）", key="l_sp")
+    if st.button("生成分析", type="primary", key="l_btn"):
+        if not cond.strip():
+            st.error("请输入治疗领域")
+        else:
+            with st.spinner("分析竞争格局..."):
+                res = analyze_competitive_landscape(cond.strip(), sponsor=sponsor or None)
+            st.session_state.landscape_data = res
+            st.session_state.ov_cond = cond.strip()
+            _push_recent(cond.strip())
+    res = st.session_state.landscape_data
+    if not res:
+        st.info("输入治疗领域生成分析。")
+        return
+    if "error" in res:
+        st.error(res["error"])
+        return
+
+    cn = sum(1 for t in res.get("top_sponsors", []) if _is_chinese(t["sponsor"]))
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("总试验", res.get("total_trials", 0))
+    m2.metric("活跃试验", res.get("active_trials", 0))
+    m3.metric("主要申办方", len(res.get("top_sponsors", [])))
+    m4.metric("中国药企", cn)
+
+    top = res.get("top_sponsors", [])
+    if top:
+        df = pd.DataFrame([{"申办方": t["sponsor"][:14], "试验数": t["trial_count"]} for t in top]).sort_values("试验数")
+        _chart(px.bar(df, x="试验数", y="申办方", orientation="h", color_discrete_sequence=["#d98841"]))
+
+    pd_ = res.get("phase_distribution", {})
+    phases = {p: len(v) for p, v in pd_.items() if v}
+    if phases:
+        dfp = pd.DataFrame([{"阶段": k, "试验数": v} for k, v in phases.items()])
+        _chart(px.bar(dfp, x="阶段", y="试验数", color="阶段", color_discrete_sequence=MORANDI))
+
+    if st.button("★ 加入我的监测", key="l_watch"):
+        _add_watch(cond.strip())
+
+    if st.button("生成 AI 竞争简报", key="l_ai"):
+        with st.spinner("AI 撰写中..."):
+            out = run_agent(
+                f"请用中文撰写 {cond.strip()} 竞争格局简报：主要玩家管线布局、各阶段竞争密度、"
+                f"值得关注的趋势或空白领域、给 BD 团队的策略建议。",
+                client=client, model=MODEL, verbose=False)
+        final = out.get("final_response", "")
+        if final:
+            st.markdown(_linkify(final))
+        else:
+            st.info("未能生成简报。")
 
 
-def _render_charts_from_trace(trace: list[dict]):
-    """从工具调用轨迹中提取结构化数据，绘制图表。"""
-    # 找 analyze_competitive_landscape 的结果
-    for step in trace:
-        if step.get("tool") == "analyze_competitive_landscape":
-            try:
-                raw = step.get("result_preview", "")
-                # 尝试从 trace 的完整 result 中解析（trace 存的是截断版，这里靠 agent.py 塞入的完整数据）
-                data = json.loads(step.get("_full_result", raw))
-            except (json.JSONDecodeError, KeyError):
-                continue
-
-            top_sponsors = data.get("top_sponsors", [])
-            phase_dist = data.get("phase_distribution", {})
-
-            if top_sponsors:
-                df_sponsor = {
-                    "申办方": [s["sponsor"][:15] for s in top_sponsors],
-                    "试验数": [s["trial_count"] for s in top_sponsors],
-                }
-                st.subheader("🏢 主要申办方试验分布")
-                st.bar_chart(df_sponsor, x="申办方", y="试验数", use_container_width=True)
-
-            if phase_dist:
-                phases_with_counts = {p: len(v) for p, v in phase_dist.items() if v}
-                if phases_with_counts:
-                    st.subheader("📊 各阶段试验分布")
-                    df_phase = {"阶段": list(phases_with_counts.keys()), "试验数": list(phases_with_counts.values())}
-                    st.bar_chart(df_phase, x="阶段", y="试验数", use_container_width=True)
-
-            break  # 只处理第一个 landscape 结果
-
-    # 找 search_clinical_trials 的结果 → 渲染表格
-    for step in trace:
-        if step.get("tool") == "search_clinical_trials":
-            try:
-                raw = step.get("_full_result", step.get("result_preview", ""))
-                data = json.loads(raw) if isinstance(raw, str) else raw
-            except (json.JSONDecodeError, KeyError):
-                continue
-            studies = data.get("studies", []) if isinstance(data, dict) else []
-            if studies:
-                st.subheader("📋 检索结果")
-                st.markdown(_render_trial_table(studies))
-            break
-
-    # 找 monitor_recent_changes 的结果
-    for step in trace:
-        if step.get("tool") == "monitor_recent_changes":
-            try:
-                raw = step.get("_full_result", step.get("result_preview", ""))
-                data = json.loads(raw) if isinstance(raw, str) else raw
-            except (json.JSONDecodeError, KeyError):
-                continue
-            studies = data.get("studies", []) if isinstance(data, dict) else []
-            if studies:
-                st.subheader(f"📅 近期更新 ({data.get('since_date', '')})")
-                st.markdown(_render_trial_table(studies))
-            break
-
-    # 找 search_pubmed 的结果
-    for step in trace:
-        if step.get("tool") == "search_pubmed":
-            try:
-                raw = step.get("_full_result", step.get("result_preview", ""))
-                data = json.loads(raw) if isinstance(raw, str) else raw
-            except (json.JSONDecodeError, KeyError):
-                continue
-            articles = data.get("articles", []) if isinstance(data, dict) else []
-            if articles:
-                st.subheader("📄 相关文献")
-                st.markdown(_render_pubmed_table(articles))
-            break
+def render_search():
+    st.markdown(_viewhead("试验检索", "按疾病 / 靶点 / 公司检索 ClinicalTrials.gov"))
+    q = st.text_input("疾病或关键词", key="s_q", placeholder="NSCLC, CAR-T, PD-1...")
+    sponsor = st.text_input("申办方（可选）", key="s_sp")
+    status = st.selectbox("状态（可选）", ["", "RECRUITING", "ACTIVE_NOT_RECRUITING", "COMPLETED",
+                                           "TERMINATED", "WITHDRAWN"], key="s_st")
+    if st.button("检索", type="primary", key="s_btn"):
+        if not q.strip():
+            st.error("请输入关键词")
+        else:
+            with st.spinner("检索中..."):
+                res = search_clinical_trials(q.strip(), sponsor=sponsor or None,
+                                             status=status or None, page_size=15)
+            st.session_state.search_res = res
+            _push_recent(q.strip())
+    res = st.session_state.search_res
+    if not res:
+        st.info("输入关键词检索。")
+        return
+    if "error" in res:
+        st.error(res["error"])
+        return
+    studies = res.get("studies", [])
+    st.markdown(f"**共 {res.get('total_count', 0)} 条结果**")
+    for s in studies:
+        _trial_row(s)
+    if studies:
+        nct = st.selectbox("查看试验详情", [s["nct_id"] for s in studies], key="s_detail")
+        d = get_trial_detail(nct)
+        if "error" not in d:
+            st.markdown(f"### {d.get('brief_title')}")
+            st.markdown(f"**申办方**: {d.get('sponsor')}  ")
+            st.markdown(f"**阶段**: {d.get('phase') or '-'} · **状态**: {d.get('overall_status')}  ")
+            st.markdown(f"[查看原始协议]({d.get('nct_link')})")
+            if d.get("brief_summary"):
+                st.markdown(d["brief_summary"])
+            if d.get("primary_outcomes"):
+                st.markdown("**主要终点**: " + "; ".join(d["primary_outcomes"]))
 
 
-# ── 侧边栏：设置 + 筛选面板 ──
+def render_monitor():
+    st.markdown(_viewhead("每日监测", "追踪治疗领域近期新增 / 更新试验"))
+    cond = st.text_input("治疗领域", value=st.session_state.ov_cond, key="m_cond")
+    days = st.number_input("监测天数", min_value=1, max_value=90, value=7, key="m_days")
+    if st.button("监测", type="primary", key="m_btn"):
+        with st.spinner("监测中..."):
+            res = monitor_recent_changes((cond.strip() or "cancer"), since_days=days)
+        st.session_state.monitor_data = res
+        if cond.strip():
+            _push_recent(cond.strip())
+    res = st.session_state.monitor_data
+    if not res:
+        st.info("输入治疗领域开始监测。")
+        return
+    if "error" in res:
+        st.error(res["error"])
+        return
+    st.metric("新增 / 更新", res.get("new_and_updated_count", 0))
+    studies = res.get("studies", [])
+    if studies:
+        dates = [(s.get("last_update_post_date") or s.get("study_first_post_date") or "")[:10] for s in studies]
+        dates = [d for d in dates if d]
+        if dates:
+            cnt = Counter(dates)
+            sd = sorted(cnt.keys())
+            fig = go.Figure(go.Scatter(x=sd, y=[cnt[d] for d in sd], mode="lines+markers",
+                                       line=dict(color="#d98841", width=2), fill="tozeroy",
+                                       fillcolor="rgba(217,136,65,0.12)"))
+            _chart(fig)
+    for s in studies[:30]:
+        _trial_row(s)
 
-with st.sidebar:
-    st.header("⚙️ Settings")
 
-    api_key = st.text_input(
-        "API Key", type="password",
-        value=os.getenv("OPENAI_API_KEY", os.getenv("DEEPSEEK_API_KEY", "")),
-        help="支持 OpenAI 及任何兼容 OpenAI 协议的端点（如 DeepSeek）。也可在 .env 中配置。",
-    )
-
-    model = st.selectbox(
-        "Model",
-        ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "deepseek-chat"],
-        index=0,
-    )
-    custom_model = st.text_input("自定义模型名（可选）", value="", help="例如 deepseek-reasoner")
-    if custom_model.strip():
-        model = custom_model.strip()
-
-    base_url = st.text_input(
-        "API Base URL（可选）",
-        value=os.getenv("OPENAI_BASE_URL", os.getenv("DEEPSEEK_BASE_URL", "")),
-        help="DeepSeek 填 https://api.deepseek.com",
-    )
-
-    st.divider()
-    st.header("🔍 筛选条件")
-
-    # 结构化筛选控件
-    filter_sponsor = st.text_input("申办方名称", value="", placeholder="如 AstraZeneca, Roche…")
-    filter_status = st.selectbox(
-        "试验状态", ["", "RECRUITING", "ACTIVE_NOT_RECRUITING", "COMPLETED",
-                      "TERMINATED", "WITHDRAWN", "SUSPENDED", "ENROLLING_BY_INVITATION"],
-        index=0,
-    )
-    filter_phase = st.multiselect(
-        "临床分期", ["Phase 1", "Phase 2", "Phase 3", "Phase 4"],
-        default=None,
-    )
-    filter_days = st.number_input("监测时间范围（天）", min_value=1, max_value=365, value=7)
-
-    st.divider()
-    st.markdown("### 💼 BD Use Cases")
+def render_compare():
+    st.markdown(_viewhead("竞品对比", "并排对比多个试验：设计 / 终点 / 竞争定位"))
+    ids = st.text_area("输入 NCT ID（逗号分隔，最多 5 个）", key="c_ids",
+                       placeholder="NCT04267848, NCT04191356")
+    if st.button("对比", type="primary", key="c_btn"):
+        ncts = [x.strip() for x in ids.split(",") if x.strip()]
+        if len(ncts) < 2:
+            st.error("至少输入 2 个 NCT ID")
+        else:
+            with st.spinner("对比中..."):
+                res = compare_trials_side_by_side(ncts[:5], llm_client=client, model=MODEL)
+            st.session_state.compare_data = res
+    res = st.session_state.compare_data
+    if not res:
+        st.info("输入至少 2 个 NCT ID 对比。")
+        return
+    comp = res.get("trials_comparison", [])
+    if not comp:
+        st.error("未获取到对比数据。")
+        return
+    fields = [
+        ("申办方", "sponsor"), ("阶段", "phase"), ("状态", "status"),
+        ("条件", "conditions"), ("干预", "interventions"), ("主要终点", "primary_outcomes"),
+    ]
+    head = "".join(f"<th>{f[0]}</th>" for f in fields)
+    rows = ""
+    for t in comp:
+        cells = ""
+        for _, key in fields:
+            v = t.get(key, "")
+            if isinstance(v, list):
+                v = "; ".join(map(str, v))
+            cells += f"<td>{v}</td>"
+        link = t.get("nct_link", "")
+        rows += f'<tr><td><a href="{link}" target="_blank">{t.get("nct_id")}</a></td>{cells}</tr>'
     st.markdown(
-        "**Competitive Landscape**\n"
-        '- "Show me the competitive landscape for NSCLC"\n'
-        '- "What is Roche doing in breast cancer?"\n\n'
-        "**Daily Monitoring**\n"
-        '- "What changed in the last week for CAR-T?"\n'
-        '- "Any new GLP-1 trials this month?"\n\n'
-        "**Deep Dive**\n"
-        '- "Compare NCT04267848 and NCT04191356"\n'
-        '- "What trials does AstraZeneca have for EGFR mutant NSCLC?"'
+        f'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+        f'<thead><tr><th>NCT</th>{head}</tr></thead><tbody>{rows}</tbody></table></div>',
+        unsafe_allow_html=True,
     )
+    if res.get("llm_comparison"):
+        st.markdown("### AI 对比分析")
+        st.markdown(_linkify(res["llm_comparison"]))
 
 
-# ── 快捷操作按钮 ──
-
-st.markdown("### 快捷操作")
-col_a, col_b, col_c, col_d = st.columns(4)
-with col_a:
-    if st.button("📊 NSCLC 竞争格局", use_container_width=True):
-        st.session_state.preset_query = "分析 NSCLC 的竞争格局，列出主要药企的试验分布"
-with col_b:
-    if st.button("🔍 AstraZeneca 在做什么", use_container_width=True):
-        st.session_state.preset_query = "AstraZeneca 在 NSCLC 领域有哪些临床试验？各处于什么阶段？"
-with col_c:
-    if st.button("📅 CAR-T 本周更新", use_container_width=True):
-        st.session_state.preset_query = "过去一周 CAR-T 疗法有什么新的临床试验？请列出新增和更新的试验"
-with col_d:
-    if st.button("⚖️ 对比两个试验", use_container_width=True):
-        st.session_state.preset_query = "帮我对比一下 NCT04267848 和 NCT04191356，从试验设计、入排标准和竞争定位角度分析"
-
-# 初始化 session_state（首次加载）
-if "preset_query" not in st.session_state:
-    st.session_state.preset_query = ""
-
-# ── 查询输入框 ──
-
-query_placeholder = (
-    "e.g.: 分析一下 NSCLC 领域的竞争格局，重点关注 PD-1/PD-L1 药物的临床试验分布。\n"
-    "或者：帮我看一下这周有哪些新的 CAR-T 临床试验登记了。"
-)
-
-query = st.text_area(
-    "输入你的查询",
-    value=st.session_state.get("preset_query", ""),
-    placeholder=query_placeholder,
-    height=100,
-)
-
-# 用户手动修改了输入后，清除预设值（避免覆盖用户手写内容）
-if query != st.session_state.get("preset_query", ""):
-    st.session_state.preset_query = ""
-
-col1, col2 = st.columns([1, 5])
-with col1:
-    run_btn = st.button("▶ Run Agent", type="primary", use_container_width=True)
+def render_china():
+    st.markdown(_viewhead("中国管线", "中国药企管线 + CDE 审批进度"))
+    tab1, tab2 = st.tabs(["管线检索", "CDE 审批"])
+    with tab1:
+        cond = st.text_input("治疗领域", value=st.session_state.ov_cond, key="cn_cond")
+        if st.button("检索中国管线", type="primary", key="cn_btn"):
+            with st.spinner("检索中..."):
+                res = search_chinese_pipeline(cond.strip())
+            st.session_state.china_data = res
+            if cond.strip():
+                _push_recent(cond.strip())
+        res = st.session_state.china_data
+        if res and "error" not in res:
+            st.metric("中国药企试验", res.get("total_chinese_trials", 0))
+            for sp in res.get("chinese_sponsors", []):
+                st.markdown(f"**{sp['sponsor']}** · {sp['trial_count']} 项")
+                for t in sp["trials"]:
+                    _trial_row(t)
+            if res.get("chictr_search_link"):
+                st.markdown(f"[在 ChiCTR 检索 {res.get('condition')}]({res['chictr_search_link']})")
+    with tab2:
+        drug = st.text_input("药品名（中 / 英）", key="cde_drug")
+        if st.button("查询 CDE", type="primary", key="cde_btn"):
+            with st.spinner("查询中..."):
+                res = search_cde_approvals(drug.strip())
+            st.session_state.cde_data = res
+        res = st.session_state.cde_data
+        if res:
+            st.markdown(f"[CDE 数据查询：{res['drug_name']}]({res['cde_search_link']})  ")
+            st.markdown(f"[药物临床试验登记平台]({res['clinical_trial_link']})")
+            for k, v in res.get("quick_links", {}).items():
+                st.markdown(f"- [{k}]({v})")
+            if res.get("related_chinese_trials"):
+                st.markdown("**关联中国试验**")
+                for t in res["related_chinese_trials"]:
+                    _trial_row(t)
 
 
-# ── 主要运行逻辑 ──
-
-if run_btn:
-    if not api_key:
-        st.error("请先在侧边栏填入 API Key。")
-        st.stop()
-    if not query.strip():
-        st.error("请输入查询内容。")
-        st.stop()
-
-    # ── 构建包含筛选条件的查询 ──
-    filter_parts = []
-    if filter_sponsor.strip():
-        filter_parts.append(f"申办方={filter_sponsor.strip()}")
-    if filter_status:
-        filter_parts.append(f"状态={filter_status}")
-    if filter_phase:
-        filter_parts.append(f"分期={','.join(filter_phase)}")
-    if filter_parts:
-        # 将筛选条件作为系统指令嵌入用户查询
-        filter_text = "; ".join(filter_parts)
-        enriched_query = f"[筛选条件: {filter_text}]\n{query.strip()}"
-    else:
-        enriched_query = query.strip()
-
-    from openai import OpenAI
-    client = OpenAI(
-        api_key=api_key,
-        base_url=base_url.strip() if base_url.strip() else None,
-    )
-
-    # ── 发起请求，展示结构化结果 ──
-    result_placeholder = st.empty()
-    with st.spinner("🧠 Agent is thinking and calling tools..."):
-        result = run_agent(
-            user_query=enriched_query,
-            client=client,
-            model=model,
-            verbose=False,
-        )
-
-    st.divider()
-
-    # ── 显示 Agent 回复 ──
+def render_assistant():
+    st.markdown(_viewhead("智能助手", "自由提问，Agent 自动调用工具检索并整合"))
+    preset = st.session_state.preset_query
+    query = st.text_area("输入查询", value=preset, key="a_query", height=100)
+    if query != preset:
+        st.session_state.preset_query = ""
+    if st.button("▶ 运行 Agent", type="primary", key="a_btn"):
+        if not query.strip():
+            st.error("请输入查询")
+        elif not os.getenv("DEEPSEEK_API_KEY"):
+            st.error("未在 .env 中找到 DEEPSEEK_API_KEY。")
+        else:
+            _push_recent(query.strip())
+            with st.spinner("Agent 思考中..."):
+                result = run_agent(query.strip(), client=client, model=MODEL, verbose=False)
+            st.session_state.assistant_result = result
+    result = st.session_state.assistant_result
+    if not result:
+        st.info("输入查询并运行 Agent，或使用右侧快捷查询。")
+        return
     final = result.get("final_response", "")
     if final:
-        st.subheader("📋 Agent Response")
-
-        # 检查是否包含错误标记
-        if "[凭证错误]" in final or "[限流]" in final or "[超时]" in final or "[工具调用失败]" in final:
+        if any(x in final for x in ("[凭证错误]", "[限流]", "[超时]", "[工具调用失败]")):
             st.error(final)
         else:
-            # 自动补全原文链接：将文本中的 NCT 编号和 PMID 转为可点击链接
-            import re as _re
-            linked = final
-            linked = _re.sub(r"(?<!\[)(NCT\d{8})(?!\])",
-                           r"[\1](https://clinicaltrials.gov/study/\1)", linked)
-            linked = _re.sub(r"(?<!\[)(\b\d{8}\b)(?!\])(?=[^]]*(?:\[[^]]*\][^]]*)*$)",
-                           r"[\1](https://pubmed.ncbi.nlm.nih.gov/\1/)", linked)
-            st.markdown(linked)
+            st.markdown(_linkify(final))
+        with st.expander("Agent trace（工具调用与推理）", expanded=False):
+            for i, step in enumerate(result.get("trace", [])):
+                st.markdown(f"**Step {i+1}**: `{step['tool']}`")
+                st.json(step.get("arguments", {}))
+    else:
+        st.info("未获得结果。")
 
-        # Agent 调用轨迹（调试用，非数据可视化）
-        trace = result.get("trace", [])
-        with st.expander("🔍 Agent trace (tool calls & reasoning)", expanded=False):
-            for i, step in enumerate(trace):
-                st.markdown(f"**Step {i+1}**: `{step['tool']}(...)`")
-                st.code(json.dumps(step["arguments"], ensure_ascii=False, indent=2)
-                        if isinstance(step["arguments"], dict) else step["arguments"], language="json")
-                # 截断显示结果
-                preview = step.get("result_preview", "")
-                if len(preview) > 500:
-                    preview = preview[:500] + "..."
-                st.code(preview, language="json")
-                if i < len(trace) - 1:
-                    st.divider()
 
-    st.success("Done! 如有筛选条件，Agent 会自动在查询中应用。")
+# ── 右侧业务快捷栏 ──
+def render_right_bar():
+    st.markdown('<div class="righthead">业务快捷</div>', unsafe_allow_html=True)
+    st.markdown('<div class="rlabel">快捷查询</div>', unsafe_allow_html=True)
+    quick = {"CAR-T 细胞疗法": "CAR-T", "NSCLC 非小细胞肺癌": "NSCLC",
+             "PD-1 / PD-L1": "PD-1", "ADC 抗体偶联药物": "ADC"}
+    for label, q in quick.items():
+        if st.button(label, key=f"q_{q}", use_container_width=True):
+            st.session_state.preset_query = f"分析 {q} 领域的竞争格局，并列出近期重要更新"
+            st.session_state.nav = "智能助手"
+            st.rerun()
+    st.markdown('<div class="rlabel">我的监测</div>', unsafe_allow_html=True)
+    if not st.session_state.watchlist:
+        st.markdown('<div class="rhint">暂无监测项</div>', unsafe_allow_html=True)
+    for i, w in enumerate(st.session_state.watchlist):
+        if st.button(f"● {w}", key=f"w_{i}", use_container_width=True):
+            st.session_state.nav = "总览"
+            st.session_state.ov_cond = w
+            st.rerun()
+    st.markdown('<div class="rlabel">最近查询</div>', unsafe_allow_html=True)
+    for r in st.session_state.recent[::-1][:6]:
+        st.markdown(f'<div class="rhist">{r}</div>', unsafe_allow_html=True)
 
-elif not query and not run_btn:
-    st.info("输入查询并点击 Run Agent，或使用上方的快捷按钮。侧边栏的筛选条件会自动附加到查询中。")
+
+# ── 主结构 ──
+with st.sidebar:
+    st.markdown('<div class="navbrand">BD 情报<br><span>药企竞品监测</span></div>', unsafe_allow_html=True)
+    NAV = ["总览", "竞争格局", "试验检索", "每日监测", "竞品对比", "中国管线", "智能助手"]
+    view = st.radio("导航", NAV, index=NAV.index(st.session_state.nav), key="nav",
+                    label_visibility="collapsed")
+
+center, right = st.columns([4, 1.1])
+with right:
+    render_right_bar()
+with center:
+    if view == "总览":
+        render_overview()
+    elif view == "竞争格局":
+        render_landscape()
+    elif view == "试验检索":
+        render_search()
+    elif view == "每日监测":
+        render_monitor()
+    elif view == "竞品对比":
+        render_compare()
+    elif view == "中国管线":
+        render_china()
+    elif view == "智能助手":
+        render_assistant()
