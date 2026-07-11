@@ -137,10 +137,10 @@ CSS = """
 [data-testid="stRadio"] { padding:8px 6px 16px; }
 [data-testid="stRadio"] > label { font-size:15px !important; font-weight:600 !important; color:#3d3a36 !important; }
 [data-testid="stRadio"] [role="radiogroup"] > label {
-    display:flex !important; align-items:center !important;
-    padding:14px 12px !important; margin:4px 0 !important;
+    display:flex !important; align-items:center !important; justify-content:center !important;
+    padding:15px 12px !important; margin:6px 0 !important;
     border-radius:10px !important; border:1.5px solid transparent !important;
-    font-size:16px !important; font-weight:650 !important; color:#4a4540 !important;
+    font-size:17px !important; font-weight:650 !important; color:#3d3a36 !important;
     transition:all 0.15s ease !important; gap:10px !important;
 }
 [data-testid="stRadio"] [role="radiogroup"] > label:hover {
@@ -172,19 +172,41 @@ CSS = """
 .viewhead h1 { font-size:30px; font-weight:800; color:#1a1816; margin:0 0 4px; letter-spacing:-0.3px; }
 .viewhead .sub { font-size:14px; color:#6b6560; margin-top:4px; }
 
+/* ── 通用卡片容器（左导航 / 右快捷栏）── */
+.card {
+    background:#ffffff;
+    border:1px solid #e8e3db;
+    border-radius:16px;
+    padding:24px 22px;
+    box-shadow:0 1px 5px rgba(0,0,0,0.04);
+}
+.nav-card { margin:12px 14px; }
+.right-card { margin:0; }
+/* 卡片内细分割线 */
+.card-divider {
+    height:0; border:0; border-top:1px solid #efeae2;
+    margin:20px 0;
+}
+/* 卡片内板块标题（居中、加粗、加深） */
+.card-section {
+    text-align:center;
+    font-size:16px; font-weight:800; color:#2a2520;
+    margin:4px 0 14px; letter-spacing:0.6px;
+}
+
 /* ── 导航品牌 ── */
-.navbrand { font-size:22px; font-weight:900; color:#1a1816; padding:14px 4px 20px; line-height:1.35; letter-spacing:-0.3px; }
-.navbrand span { font-size:14px; font-weight:500; color:#7a756d; display:block;margin-top:3px; }
+.navbrand { text-align:center; font-size:23px; font-weight:900; color:#1a1816; padding:8px 0 18px; line-height:1.35; letter-spacing:-0.3px; }
+.navbrand span { font-size:14px; font-weight:500; color:#7a756d; display:block;margin-top:4px; }
 
 /* ── 右侧快捷栏 ── */
-.righthead { font-size:17px; font-weight:800; color:#1a1816; margin-bottom:18px; }
-.rlabel { font-size:13px; font-weight:700; color:#5a554f; margin:22px 0 10px; letter-spacing:0.5px; }
-.rhint, .rhist { font-size:14px; color:#4a4540; padding:8px 0; line-height:1.6; }
+.righthead { text-align:center; font-size:19px; font-weight:800; color:#1a1816; margin-bottom:16px; }
+.rlabel { text-align:center; font-size:15px; font-weight:800; color:#2a2520; margin:16px 0 12px; letter-spacing:0.5px; }
+.rhint, .rhist { text-align:center; font-size:14px; color:#4a4540; padding:10px 0; line-height:1.7; }
 .stButton>button[key*="q_"], .stButton>button[key*="w_"] {
-    font-size:14px !important; font-weight:600 !important;
+    font-size:15px !important; font-weight:600 !important;
     background:#fbe9dd !important; color:#8b5020 !important; border:1px solid #f0cfae !important;
-    border-radius:10px !important; padding:12px 16px !important; margin:6px 0 !important;
-    height:auto !important; white-space:normal !important; text-align:left !important;
+    border-radius:10px !important; padding:14px 18px !important; margin:8px 0 !important;
+    height:auto !important; white-space:normal !important; text-align:center !important;
 }
 .stButton>button[key*="q_"]:hover { background:#fad4be !important; }
 
@@ -626,8 +648,10 @@ def render_assistant():
 
 # ── 右侧业务快捷栏 ──
 def render_right_bar():
+    st.markdown('<div class="card right-card">', unsafe_allow_html=True)
     st.markdown('<div class="righthead">业务快捷</div>', unsafe_allow_html=True)
-    st.markdown('<div class="rlabel">快捷查询</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card-divider"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="card-section">快捷查询</div>', unsafe_allow_html=True)
     quick = {"CAR-T 细胞疗法": "CAR-T", "NSCLC 非小细胞肺癌": "NSCLC",
              "PD-1 / PD-L1": "PD-1", "ADC 抗体偶联药物": "ADC"}
     for label, q in quick.items():
@@ -636,7 +660,8 @@ def render_right_bar():
             # 用延迟跳转：设中间变量，在 radio 渲染前消费（避免改已绑定 widget 的值）
             st.session_state._pending_nav = "智能助手"
             st.rerun()
-    st.markdown('<div class="rlabel">我的监测</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card-divider"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="card-section">我的监测</div>', unsafe_allow_html=True)
     if not st.session_state.watchlist:
         st.markdown('<div class="rhint">暂无监测项</div>', unsafe_allow_html=True)
     for i, w in enumerate(st.session_state.watchlist):
@@ -644,9 +669,11 @@ def render_right_bar():
             st.session_state._pending_nav = "总览"
             st.session_state._pending_cond = w
             st.rerun()
-    st.markdown('<div class="rlabel">最近查询</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card-divider"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="card-section">最近查询</div>', unsafe_allow_html=True)
     for r in st.session_state.recent[::-1][:6]:
         st.markdown(f'<div class="rhist">{r}</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ── 主结构 ──
@@ -657,10 +684,12 @@ if st.session_state.get("_pending_cond"):
     st.session_state.ov_cond = st.session_state.pop("_pending_cond")
 
 with st.sidebar:
+    st.markdown('<div class="card nav-card">', unsafe_allow_html=True)
     st.markdown('<div class="navbrand">BD 情报<br><span>药企竞品监测</span></div>', unsafe_allow_html=True)
     NAV = ["总览", "竞争格局", "试验检索", "每日监测", "竞品对比", "中国管线", "智能助手"]
     view = st.radio("导航", NAV, index=NAV.index(st.session_state.nav), key="nav",
                     label_visibility="collapsed")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 center, right = st.columns([4, 1.1])
 with right:
