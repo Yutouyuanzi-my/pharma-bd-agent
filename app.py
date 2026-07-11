@@ -31,9 +31,6 @@ from tools import (
 )
 from agent import register_tool, run_agent
 from openai import OpenAI
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 
 # ── 工具注册（供 智能助手 的 Agent 调用）──
 register_tool("search_clinical_trials", search_clinical_trials, {
@@ -246,6 +243,11 @@ def _viewhead(title, sub):
 
 # ── 各视图渲染 ──
 def render_overview():
+    # 懒加载：只在用户点「生成看板」时才导入重库，首页秒开
+    import pandas as pd
+    import plotly.express as px
+    import plotly.graph_objects as go
+
     st.markdown(_viewhead("总览", "一键聚合治疗领域的试验规模、竞争格局与近期动态"))
     cond = st.text_input("监测主题（治疗领域 / 靶点）", value=st.session_state.ov_cond,
                          key="ov_input", placeholder="如 NSCLC, PD-1, CAR-T")
@@ -309,6 +311,9 @@ def render_overview():
 
 
 def render_landscape():
+    import pandas as pd
+    import plotly.express as px
+
     st.markdown(_viewhead("竞争格局", "分析治疗领域的竞争密度：主要玩家与阶段分布"))
     cond = st.text_input("治疗领域", value=st.session_state.ov_cond, key="l_cond")
     sponsor = st.text_input("聚焦申办方（可选）", key="l_sp")
@@ -404,6 +409,8 @@ def render_search():
 
 
 def render_monitor():
+    import plotly.graph_objects as go
+
     st.markdown(_viewhead("每日监测", "追踪治疗领域近期新增 / 更新试验"))
     cond = st.text_input("治疗领域", value=st.session_state.ov_cond, key="m_cond")
     days = st.number_input("监测天数", min_value=1, max_value=90, value=7, key="m_days")
