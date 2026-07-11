@@ -248,7 +248,7 @@ def render_overview():
     import plotly.express as px
     import plotly.graph_objects as go
 
-    st.markdown(_viewhead("总览", "一键聚合治疗领域的试验规模、竞争格局与近期动态"))
+    st.markdown(_viewhead("总览", "一键聚合治疗领域的试验规模、竞争格局与近期动态"), unsafe_allow_html=True)
     cond = st.text_input("监测主题（治疗领域 / 靶点）", value=st.session_state.ov_cond,
                          key="ov_input", placeholder="如 NSCLC, PD-1, CAR-T")
     if st.button("生成看板", type="primary", key="ov_btn"):
@@ -314,7 +314,7 @@ def render_landscape():
     import pandas as pd
     import plotly.express as px
 
-    st.markdown(_viewhead("竞争格局", "分析治疗领域的竞争密度：主要玩家与阶段分布"))
+    st.markdown(_viewhead("竞争格局", "分析治疗领域的竞争密度：主要玩家与阶段分布"), unsafe_allow_html=True)
     cond = st.text_input("治疗领域", value=st.session_state.ov_cond, key="l_cond")
     sponsor = st.text_input("聚焦申办方（可选）", key="l_sp")
     if st.button("生成分析", type="primary", key="l_btn"):
@@ -369,7 +369,7 @@ def render_landscape():
 
 
 def render_search():
-    st.markdown(_viewhead("试验检索", "按疾病 / 靶点 / 公司检索 ClinicalTrials.gov"))
+    st.markdown(_viewhead("试验检索", "按疾病 / 靶点 / 公司检索 ClinicalTrials.gov"), unsafe_allow_html=True)
     q = st.text_input("疾病或关键词", key="s_q", placeholder="NSCLC, CAR-T, PD-1...")
     sponsor = st.text_input("申办方（可选）", key="s_sp")
     status = st.selectbox("状态（可选）", ["", "RECRUITING", "ACTIVE_NOT_RECRUITING", "COMPLETED",
@@ -411,7 +411,7 @@ def render_search():
 def render_monitor():
     import plotly.graph_objects as go
 
-    st.markdown(_viewhead("每日监测", "追踪治疗领域近期新增 / 更新试验"))
+    st.markdown(_viewhead("每日监测", "追踪治疗领域近期新增 / 更新试验"), unsafe_allow_html=True)
     cond = st.text_input("治疗领域", value=st.session_state.ov_cond, key="m_cond")
     days = st.number_input("监测天数", min_value=1, max_value=90, value=7, key="m_days")
     if st.button("监测", type="primary", key="m_btn"):
@@ -444,7 +444,7 @@ def render_monitor():
 
 
 def render_compare():
-    st.markdown(_viewhead("竞品对比", "并排对比多个试验：设计 / 终点 / 竞争定位"))
+    st.markdown(_viewhead("竞品对比", "并排对比多个试验：设计 / 终点 / 竞争定位"), unsafe_allow_html=True)
     ids = st.text_area("输入 NCT ID（逗号分隔，最多 5 个）", key="c_ids",
                        placeholder="NCT04267848, NCT04191356")
     if st.button("对比", type="primary", key="c_btn"):
@@ -489,7 +489,7 @@ def render_compare():
 
 
 def render_china():
-    st.markdown(_viewhead("中国管线", "中国药企管线 + CDE 审批进度"))
+    st.markdown(_viewhead("中国管线", "中国药企管线 + CDE 审批进度"), unsafe_allow_html=True)
     tab1, tab2 = st.tabs(["管线检索", "CDE 审批"])
     with tab1:
         cond = st.text_input("治疗领域", value=st.session_state.ov_cond, key="cn_cond")
@@ -527,7 +527,7 @@ def render_china():
 
 
 def render_assistant():
-    st.markdown(_viewhead("智能助手", "自由提问，Agent 自动调用工具检索并整合"))
+    st.markdown(_viewhead("智能助手", "自由提问，Agent 自动调用工具检索并整合"), unsafe_allow_html=True)
     preset = st.session_state.preset_query
     query = st.text_area("输入查询", value=preset, key="a_query", height=100)
     if query != preset:
