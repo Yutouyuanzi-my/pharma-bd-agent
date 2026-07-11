@@ -132,22 +132,66 @@ CSS = """
 <style>
 [data-testid="stAppViewContainer"] { background:#f4f1ec; }
 [data-testid="stSidebar"] { background:#ffffff; border-right:0.5px solid #e8e3db; }
-[data-testid="stMetric"] { background:#ffffff; border:0.5px solid #e8e3db; border-radius:12px; padding:10px 14px; }
-.viewhead { margin-bottom:14px; }
-.viewhead h1 { font-size:22px; font-weight:700; color:#3d3a36; margin:0 0 2px; }
-.viewhead .sub { font-size:12px; color:#a39c92; }
-.navbrand { font-size:15px; font-weight:700; color:#3d3a36; padding:6px 4px 14px; line-height:1.3; }
-.navbrand span { font-size:11px; font-weight:400; color:#a39c92; }
-.righthead { font-size:14px; font-weight:700; color:#3d3a36; margin-bottom:10px; }
-.rlabel { font-size:11px; color:#a39c92; margin:14px 0 6px; }
-.rhint, .rhist { font-size:12px; color:#8a847b; padding:3px 0; }
-.trow { display:flex; gap:10px; padding:10px 4px; border-bottom:0.5px solid #ece8e0; align-items:flex-start; }
-.trow .dot { width:8px; height:8px; border-radius:50%; margin-top:5px; flex:0 0 auto; }
-.tmain a { color:#3d3a36; font-size:13px; font-weight:600; text-decoration:none; }
+
+/* ── 指标卡 ── */
+[data-testid="stMetric"] {
+    background:#ffffff; border:0.5px solid #e8e3db; border-radius:14px;
+    padding:20px 22px; box-shadow:none;
+}
+[data-testid="stMetric"] > div > div:nth-child(1) > div:nth-child(1) {
+    font-size:34px !important; font-weight:800 !important; color:#111 !important;
+}
+[data-testid="stMetric"] > div > div:nth-child(1) > div:nth-child(2) {
+    font-size:15px !important; font-weight:600 !important; color:#3d3a36 !important;
+}
+[data-testid="stMetric"] > div > div:nth-child(2) {
+    font-size:13px !important; color:#6b6560 !important;
+}
+
+/* ── 视图标题 ── */
+.viewhead { margin-bottom:24px; margin-top:8px; }
+.viewhead h1 { font-size:30px; font-weight:800; color:#1a1816; margin:0 0 4px; letter-spacing:-0.3px; }
+.viewhead .sub { font-size:14px; color:#6b6560; margin-top:4px; }
+
+/* ── 导航品牌 ── */
+.navbrand { font-size:18px; font-weight:800; color:#1a1816; padding:10px 4px 18px; line-height:1.35; }
+.navbrand span { font-size:13px; font-weight:400; color:#7a756d; display:block;margin-top:2px; }
+
+/* ── 右侧快捷栏 ── */
+.righthead { font-size:17px; font-weight:800; color:#1a1816; margin-bottom:18px; }
+.rlabel { font-size:13px; font-weight:700; color:#5a554f; margin:22px 0 10px; letter-spacing:0.5px; }
+.rhint, .rhist { font-size:14px; color:#4a4540; padding:8px 0; line-height:1.6; }
+.stButton>button[key*="q_"], .stButton>button[key*="w_"] {
+    font-size:14px !important; font-weight:600 !important;
+    background:#fbe9dd !important; color:#8b5020 !important; border:1px solid #f0cfae !important;
+    border-radius:10px !important; padding:12px 16px !important; margin:6px 0 !important;
+    height:auto !important; white-space:normal !important; text-align:left !important;
+}
+.stButton>button[key*="q_"]:hover { background:#fad4be !important; }
+
+/* ── 试验行 ── */
+.trow { display:flex; gap:12px; padding:14px 6px; border-bottom:0.5px solid #ece8e0; align-items:flex-start; }
+.trow .dot { width:9px; height:9px; border-radius:50%; margin-top:6px; flex:0 0 auto; }
+.tmain a { color:#1a1816; font-size:15px; font-weight:700; text-decoration:none; line-height:1.5; }
 .tmain a:hover { color:#d98841; }
-.tmeta { font-size:11px; color:#a39c92; margin-top:3px; }
-.chip { display:inline-block; background:#fbeede; color:#9a5f2a; font-size:10px; padding:1px 7px; border-radius:10px; margin-left:6px; }
-.stButton>button { border-radius:8px; }
+.tmeta { font-size:13px; color:#5a554f; margin-top:4px; line-height:1.45; }
+.chip { display:inline-block; background:#fbeede; color:#9a5f2a; font-size:11px; padding:2px 9px; border-radius:10px; margin-left:8px; font-weight:500; }
+
+/* ── 通用按钮 ── */
+.stButton>button[type="primary"] { border-radius:10px; padding:10px 28px; font-weight:600; font-size:14px; }
+
+/* ── 区块间距 ── */
+div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column; gap: "] { gap:24px !important; }
+div[data-testid="column"] > div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column; gap: "] { gap:26px !important; }
+
+/* ── 标题 h2/h3 ── */
+h2, [data-testid="stMarkdownContainer"] > h2, h3, [data-testid="stMarkdownContainer"] > h3,
+.markdown-text-container h2, .markdown-text-container h3 {
+    font-size:19px !important; font-weight:750 !important; color:#2a2520 !important; margin-top:16px !important; margin-bottom:10px !important;
+}
+
+/* ── info/error ── */
+[data-testid="stInfo"], [data-testid="stAlert"] { font-size:14px; padding:14px 18px; border-radius:10px; }
 </style>
 """
 
@@ -210,10 +254,10 @@ def _chart(fig):
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="-apple-system, 'PingFang SC', sans-serif", size=12, color="#3d3a36"),
-        margin=dict(l=12, r=12, t=12, b=12),
-        xaxis=dict(gridcolor="#ece8e0", zeroline=False),
-        yaxis=dict(gridcolor="#ece8e0", zeroline=False),
+        font=dict(family="-apple-system, 'PingFang SC', sans-serif", size=14, color="#3d3a36"),
+        margin=dict(l=16, r=16, t=16, b=16),
+        xaxis=dict(gridcolor="#ece8e0", zeroline=False, tickfont=dict(size=13, color="#4a4540")),
+        yaxis=dict(gridcolor="#ece8e0", zeroline=False, tickfont=dict(size=13, color="#4a4540")),
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -569,15 +613,16 @@ def render_right_bar():
     for label, q in quick.items():
         if st.button(label, key=f"q_{q}", use_container_width=True):
             st.session_state.preset_query = f"分析 {q} 领域的竞争格局，并列出近期重要更新"
-            st.session_state.nav = "智能助手"
+            # 用延迟跳转：设中间变量，在 radio 渲染前消费（避免改已绑定 widget 的值）
+            st.session_state._pending_nav = "智能助手"
             st.rerun()
     st.markdown('<div class="rlabel">我的监测</div>', unsafe_allow_html=True)
     if not st.session_state.watchlist:
         st.markdown('<div class="rhint">暂无监测项</div>', unsafe_allow_html=True)
     for i, w in enumerate(st.session_state.watchlist):
         if st.button(f"● {w}", key=f"w_{i}", use_container_width=True):
-            st.session_state.nav = "总览"
-            st.session_state.ov_cond = w
+            st.session_state._pending_nav = "总览"
+            st.session_state._pending_cond = w
             st.rerun()
     st.markdown('<div class="rlabel">最近查询</div>', unsafe_allow_html=True)
     for r in st.session_state.recent[::-1][:6]:
@@ -585,6 +630,12 @@ def render_right_bar():
 
 
 # ── 主结构 ──
+# 消费右侧按钮的延迟跳转（必须在 radio widget key="nav" 渲染之前）
+if st.session_state.get("_pending_nav"):
+    st.session_state.nav = st.session_state.pop("_pending_nav")
+if st.session_state.get("_pending_cond"):
+    st.session_state.ov_cond = st.session_state.pop("_pending_cond")
+
 with st.sidebar:
     st.markdown('<div class="navbrand">BD 情报<br><span>药企竞品监测</span></div>', unsafe_allow_html=True)
     NAV = ["总览", "竞争格局", "试验检索", "每日监测", "竞品对比", "中国管线", "智能助手"]
