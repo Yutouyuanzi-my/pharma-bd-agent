@@ -138,8 +138,8 @@ CSS = """
 [data-testid="stRadio"] > label { font-size:15px !important; font-weight:600 !important; color:#3d3a36 !important; }
 [data-testid="stRadio"] [role="radiogroup"] > label {
     display:flex !important; align-items:center !important; justify-content:center !important;
-    padding:15px 12px !important; margin:6px 0 !important;
-    border-radius:10px !important; border:1.5px solid transparent !important;
+    padding:16px 14px !important; margin:8px 0 !important;
+    border-radius:11px !important; border:1.5px solid transparent !important;
     font-size:17px !important; font-weight:650 !important; color:#3d3a36 !important;
     transition:all 0.15s ease !important; gap:10px !important;
 }
@@ -173,42 +173,48 @@ CSS = """
 .viewhead .sub { font-size:14px; color:#6b6560; margin-top:4px; }
 
 /* ── 通用卡片容器（左导航 / 右快捷栏）── */
+/* 左右两侧视觉规格完全统一：白底 + 大圆角 + 柔和阴影 + 充足内边距 */
 .card {
     background:#ffffff;
     border:1px solid #e8e3db;
-    border-radius:16px;
-    padding:24px 22px;
-    box-shadow:0 1px 5px rgba(0,0,0,0.04);
+    border-radius:18px;
+    padding:28px 26px;
+    box-shadow:0 2px 14px rgba(54,44,34,0.07);
 }
-.nav-card { margin:12px 14px; }
-.right-card { margin:0; }
-/* 卡片内细分割线 */
+.nav-card { margin:14px 14px; }
+.right-card { margin:14px 0 14px 4px; }
+/* 卡片内大区块细分割线（仅区隔大区块，不分割单条按钮 / 列表项） */
 .card-divider {
-    height:0; border:0; border-top:1px solid #efeae2;
-    margin:20px 0;
+    height:0; border:0; border-top:1px solid #e6e0d6;
+    margin:22px 0;
 }
-/* 卡片内板块标题（居中、加粗、加深） */
+/* 卡片内板块标题（居中、加粗、加深、放大） */
 .card-section {
     text-align:center;
-    font-size:16px; font-weight:800; color:#2a2520;
-    margin:4px 0 14px; letter-spacing:0.6px;
+    font-size:17px; font-weight:800; color:#2a2520;
+    margin:2px 0 16px; letter-spacing:0.6px;
 }
 
 /* ── 导航品牌 ── */
-.navbrand { text-align:center; font-size:23px; font-weight:900; color:#1a1816; padding:8px 0 18px; line-height:1.35; letter-spacing:-0.3px; }
-.navbrand span { font-size:14px; font-weight:500; color:#7a756d; display:block;margin-top:4px; }
+.navbrand { text-align:center; font-size:24px; font-weight:900; color:#1a1816; padding:6px 0 16px; line-height:1.35; letter-spacing:-0.3px; }
+.navbrand span { font-size:15px; font-weight:600; color:#4a4540; display:block; margin-top:4px; }
 
 /* ── 右侧快捷栏 ── */
-.righthead { text-align:center; font-size:19px; font-weight:800; color:#1a1816; margin-bottom:16px; }
-.rlabel { text-align:center; font-size:15px; font-weight:800; color:#2a2520; margin:16px 0 12px; letter-spacing:0.5px; }
-.rhint, .rhist { text-align:center; font-size:14px; color:#4a4540; padding:10px 0; line-height:1.7; }
+.righthead { text-align:center; font-size:20px; font-weight:800; color:#1a1816; margin-bottom:18px; letter-spacing:0.4px; }
+.rlabel { text-align:center; font-size:16px; font-weight:800; color:#2a2520; margin:16px 0 12px; letter-spacing:0.5px; }
+/* 提示 / 历史列表：深炭灰 + 加宽行高 */
+.rhint, .rhist { text-align:center; font-size:15px; color:#3d3a36; padding:12px 4px; line-height:1.9; }
+/* 快捷查询按钮 / 监测项按钮：浅暖橙底 + hover / 激活态强化识别 */
 .stButton>button[key*="q_"], .stButton>button[key*="w_"] {
     font-size:15px !important; font-weight:600 !important;
-    background:#fbe9dd !important; color:#8b5020 !important; border:1px solid #f0cfae !important;
-    border-radius:10px !important; padding:14px 18px !important; margin:8px 0 !important;
+    background:#fbeede !important; color:#8b5020 !important; border:1px solid #f0cfae !important;
+    border-radius:11px !important; padding:15px 18px !important; margin:9px 0 !important;
     height:auto !important; white-space:normal !important; text-align:center !important;
+    transition:all 0.15s ease !important;
 }
-.stButton>button[key*="q_"]:hover { background:#fad4be !important; }
+.stButton>button[key*="q_"]:hover, .stButton>button[key*="w_"]:hover {
+    background:#fad4be !important; border-color:#e8b98c !important;
+}
 
 /* ── 试验行 ── */
 .trow { display:flex; gap:12px; padding:14px 6px; border-bottom:0.5px solid #ece8e0; align-items:flex-start; }
@@ -686,6 +692,7 @@ if st.session_state.get("_pending_cond"):
 with st.sidebar:
     st.markdown('<div class="card nav-card">', unsafe_allow_html=True)
     st.markdown('<div class="navbrand">BD 情报<br><span>药企竞品监测</span></div>', unsafe_allow_html=True)
+    st.markdown('<div class="card-divider"></div>', unsafe_allow_html=True)
     NAV = ["总览", "竞争格局", "试验检索", "每日监测", "竞品对比", "中国管线", "智能助手"]
     view = st.radio("导航", NAV, index=NAV.index(st.session_state.nav), key="nav",
                     label_visibility="collapsed")
