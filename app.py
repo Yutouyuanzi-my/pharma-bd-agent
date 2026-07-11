@@ -131,7 +131,26 @@ MORANDI = ["#d98841", "#a7b3a0", "#9bb0bd", "#cfa3a3", "#d8c3a5", "#b3a7b3", "#9
 CSS = """
 <style>
 [data-testid="stAppViewContainer"] { background:#f4f1ec; }
-[data-testid="stSidebar"] { background:#ffffff; border-right:0.5px solid #e8e3db; }
+[data-testid="stSidebar"] { background:#ffffff; border-right:0.5px solid #e8e3db; min-width:260px !important; width:260px !important; }
+
+/* ── 导航 radio ── */
+[data-testid="stRadio"] { padding:8px 6px 16px; }
+[data-testid="stRadio"] > label { font-size:15px !important; font-weight:600 !important; color:#3d3a36 !important; }
+[data-testid="stRadio"] [role="radiogroup"] > label {
+    display:flex !important; align-items:center !important;
+    padding:14px 12px !important; margin:4px 0 !important;
+    border-radius:10px !important; border:1.5px solid transparent !important;
+    font-size:16px !important; font-weight:650 !important; color:#4a4540 !important;
+    transition:all 0.15s ease !important; gap:10px !important;
+}
+[data-testid="stRadio"] [role="radiogroup"] > label:hover {
+    background:#faf7f2 !important; border-color:#e8dfd2 !important;
+}
+[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio-checked"] {
+    background:linear-gradient(135deg,#fbe9dd 0%,#fdeee4 100%) !important;
+    border-color:#d98841 !important; box-shadow:0 1px 6px rgba(217,136,65,0.12) !important;
+    color:#1a1816 !important; font-weight:800 !important;
+}
 
 /* ── 指标卡 ── */
 [data-testid="stMetric"] {
@@ -154,8 +173,8 @@ CSS = """
 .viewhead .sub { font-size:14px; color:#6b6560; margin-top:4px; }
 
 /* ── 导航品牌 ── */
-.navbrand { font-size:18px; font-weight:800; color:#1a1816; padding:10px 4px 18px; line-height:1.35; }
-.navbrand span { font-size:13px; font-weight:400; color:#7a756d; display:block;margin-top:2px; }
+.navbrand { font-size:22px; font-weight:900; color:#1a1816; padding:14px 4px 20px; line-height:1.35; letter-spacing:-0.3px; }
+.navbrand span { font-size:14px; font-weight:500; color:#7a756d; display:block;margin-top:3px; }
 
 /* ── 右侧快捷栏 ── */
 .righthead { font-size:17px; font-weight:800; color:#1a1816; margin-bottom:18px; }
@@ -584,7 +603,8 @@ def render_assistant():
         else:
             _push_recent(query.strip())
             with st.spinner("Agent 思考中..."):
-                result = run_agent(query.strip(), client=client, model=MODEL, verbose=False)
+                result = run_agent(query.strip(), client=client, model=MODEL,
+                                   max_tool_rounds=8, verbose=False)
             st.session_state.assistant_result = result
     result = st.session_state.assistant_result
     if not result:
