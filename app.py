@@ -130,26 +130,28 @@ MORANDI = ["#d98841", "#a7b3a0", "#9bb0bd", "#cfa3a3", "#d8c3a5", "#b3a7b3", "#9
 
 CSS = """
 <style>
+/* ── 全局背景 ── */
 [data-testid="stAppViewContainer"] { background:#f4f1ec; }
-[data-testid="stSidebar"] { background:#ffffff; border:none; min-width:260px !important; width:260px !important; }
+[data-testid="stSidebar"] { background:transparent !important; border:none; min-width:280px !important; width:280px !important; }
 
 /* ── 导航 radio ── */
-[data-testid="stRadio"] { padding:8px 6px 16px; }
-[data-testid="stRadio"] > label { font-size:15px !important; font-weight:600 !important; color:#3d3a36 !important; }
+[data-testid="stRadio"] { padding:0; }
+[data-testid="stRadio"] > label { display:none !important; }  /* 隐藏 radio 原生 label */
 [data-testid="stRadio"] [role="radiogroup"] > label {
     display:flex !important; align-items:center !important; justify-content:center !important;
-    padding:16px 14px !important; margin:8px 0 !important;
-    border-radius:11px !important; border:1.5px solid transparent !important;
-    font-size:17px !important; font-weight:650 !important; color:#3d3a36 !important;
+    padding:14px 16px !important; margin:6px 0 !important;
+    border-radius:12px !important; border:1.5px solid transparent !important;
+    font-size:16px !important; font-weight:600 !important; color:#4a4540 !important;
     transition:all 0.15s ease !important; gap:10px !important;
 }
 [data-testid="stRadio"] [role="radiogroup"] > label:hover {
     background:#faf7f2 !important; border-color:#e8dfd2 !important;
 }
 [data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio-checked"] {
-    background:linear-gradient(135deg,#fbe9dd 0%,#fdeee4 100%) !important;
-    border-color:#d98841 !important; box-shadow:0 1px 6px rgba(217,136,65,0.12) !important;
-    color:#1a1816 !important; font-weight:800 !important;
+    background:#fbe9dd !important;
+    border-color:#d98841 !important; box-shadow:0 1px 8px rgba(217,136,65,0.10) !important;
+    color:#1a1816 !important; font-weight:700 !important;
+    border-radius:14px !important;
 }
 
 /* ── 指标卡 ── */
@@ -172,24 +174,21 @@ CSS = """
 .viewhead h1 { font-size:30px; font-weight:800; color:#1a1816; margin:0 0 4px; letter-spacing:-0.3px; }
 .viewhead .sub { font-size:14px; color:#6b6560; margin-top:4px; }
 
-/* ── 通用卡片容器（左导航）── */
-/* 左侧 sidebar 已白底，卡片仅用于 padding */
+/* ── 通用卡片：左右统一纯白圆角卡片 + 浅淡悬浮阴影 + 细浅米色描边 ── */
 .card {
     background:#ffffff;
-    border:none;
-    border-radius:0;
-    padding:28px 26px;
-    box-shadow:none;
+    border:1px solid #e5e0d8;
+    border-radius:20px;
+    padding:32px 28px;
+    box-shadow:0 2px 16px rgba(54,44,34,0.06);
 }
-.nav-card { margin:0; height:100%; }
+.nav-card { margin:10px 14px; height:auto; }
+.right-card { margin:10px 14px; }
 
-/* 右侧栏：整列白底，与 sidebar 统一，去掉 card 嵌套白块 */
+/* 右侧栏：背景透明，让 .card 圆角阴影成为视觉边界 */
 [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child,
 [data-testid="stColumn"]:last-child {
-    background: #ffffff !important;
-}
-[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child > [data-testid="stVerticalBlock"] {
-    padding: 24px 20px !important;
+    background: transparent !important;
 }
 
 /* 卡片内大区块细分割线（仅区隔大区块，不分割单条按钮 / 列表项） */
@@ -663,6 +662,7 @@ def render_assistant():
 
 # ── 右侧业务快捷栏 ──
 def render_right_bar():
+    st.markdown('<div class="card right-card">', unsafe_allow_html=True)
     st.markdown('<div class="righthead">业务快捷</div>', unsafe_allow_html=True)
     st.markdown('<div class="card-divider"></div>', unsafe_allow_html=True)
     st.markdown('<div class="card-section">快捷查询</div>', unsafe_allow_html=True)
@@ -687,6 +687,7 @@ def render_right_bar():
     st.markdown('<div class="card-section">最近查询</div>', unsafe_allow_html=True)
     for r in st.session_state.recent[::-1][:6]:
         st.markdown(f'<div class="rhist">{r}</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ── 主结构 ──
