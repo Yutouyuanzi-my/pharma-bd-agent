@@ -172,6 +172,11 @@ CSS = """
 .viewhead h1 { font-size:30px; font-weight:800; color:#1a1816; margin:0 0 4px; letter-spacing:-0.3px; }
 .viewhead .sub { font-size:14px; color:#6b6560; margin-top:4px; }
 
+/* ── 右侧栏容器：去掉自带的白色背景块 ── */
+div[data-testid="column"]:last-child > [data-testid="stVerticalBlock"] {
+    background:transparent !important;
+}
+
 /* ── 通用卡片容器（左导航 / 右快捷栏）── */
 /* 纯白底无框：仅靠白底色与页面浅米色(#f4f1ec)自然区隔，无边框无阴影 */
 .card {
@@ -200,7 +205,7 @@ CSS = """
 .navbrand span { font-size:15px; font-weight:600; color:#4a4540; display:block; margin-top:4px; }
 
 /* ── 右侧快捷栏 ── */
-.righthead { text-align:center; font-size:20px; font-weight:800; color:#1a1816; margin-bottom:18px; letter-spacing:0.4px; }
+.righthead { text-align:center; font-size:20px; font-weight:800; color:#1a1816; margin:0 0 14px; letter-spacing:0.4px; }
 .rlabel { text-align:center; font-size:16px; font-weight:800; color:#2a2520; margin:16px 0 12px; letter-spacing:0.5px; }
 /* 提示 / 历史列表：深炭灰 + 加宽行高 */
 .rhint, .rhist { text-align:center; font-size:15px; color:#3d3a36; padding:12px 4px; line-height:1.9; }
