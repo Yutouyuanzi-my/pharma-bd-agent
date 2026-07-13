@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>药企 BD 竞品监测 Agent · 高保真原型</title>
+<style>
+:root{
+  --bg:#f4f1ec; --card:#fff; --border:#e5e0d8; --orange:#d98841;
+  --orange-soft:#fbe9dd; --orange-deep:#c8772f;
+  --ink:#1a1816; --ink2:#2a2520; --ink3:#3d3a36; --muted:#7a756d;
+  --divider:#e6e0d6; --shadow:0 2px 16px rgba(54,44,34,.06); --radius:20px;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink3);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+  -webkit-font-smoothing:antialiased;}
+.layout{display:flex;gap:14px;padding:14px;align-items:flex-start;}
+.left-card,.right-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);position:sticky;top:14px;align-self:flex-start;
+  height:calc(100vh - 28px);overflow-y:auto;}
+.left-card{width:280px;padding:28px 22px;flex-shrink:0;}
+.right-card{width:330px;padding:28px 22px;flex-shrink:0;}
+.center{flex:1;min-width:0;}
+
+/* ── 左侧导航 ── */
+.navbrand{text-align:center;font-size:24px;font-weight:900;color:var(--ink);line-height:1.35;}
+.navbrand span{display:block;font-size:15px;font-weight:600;color:var(--ink3);margin-top:4px;}
+.card-divider{height:0;border:0;border-top:1px solid var(--divider);margin:22px 0;}
+.nav-item{padding:14px 16px;margin:6px 0;border-radius:12px;cursor:pointer;text-align:center;
+  font-size:16px;font-weight:600;color:var(--ink3);transition:all .15s ease;border:1.5px solid transparent;}
+.nav-item:hover{background:#faf7f2;}
+.nav-item.active{background:var(--orange-soft);color:var(--ink);font-weight:700;
+  border:1.5px solid var(--orange);border-radius:14px;}
+
+/* ── 右侧业务快捷 ── */
+.righthead{text-align:center;font-size:20px;font-weight:800;color:var(--ink);margin-bottom:4px;}
+.card-section{text-align:center;font-size:16px;font-weight:800;color:var(--ink2);margin:4px 0 12px;}
+.rbtn{display:block;width:100%;text-align:center;font-size:15px;font-weight:600;
+  background:var(--orange-soft);color:#8b5020;border:1px solid #f0cfae;border-radius:11px;
+  padding:14px 18px;margin:9px 0;cursor:pointer;transition:all .15s ease;}
+.rbtn:hover{background:#fad4be;border-color:#e8b98c;}
+.rhint,.rhist{text-align:center;font-size:15px;color:var(--ink3);padding:11px 4px;line-height:1.9;}
+.rhist{font-weight:600;}
+
+/* ── 视图通用 ── */
+.view{display:none;}
+.view.active{display:block;}
+.viewhead{margin-bottom:10px;}
+.viewhead h1{font-size:28px;font-weight:800;color:var(--ink);margin:0;letter-spacing:-.3px;}
+.viewhead .sub{color:var(--muted);font-size:14px;margin-top:6px;}
+.row-inline{display:flex;gap:10px;margin:16px 0;flex-wrap:wrap;align-items:center;}
+.input{flex:1;min-width:180px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;
+  font-size:14px;background:#fff;color:var(--ink3);font-family:inherit;}
+.input:focus{outline:none;border-color:var(--orange);}
+.select{padding:12px 14px;border:1px solid var(--border);border-radius:10px;font-size:14px;background:#fff;color:var(--ink3);font-family:inherit;}
+.btn{background:var(--orange);color:#fff;border:none;border-radius:10px;padding:12px 22px;
+  font-weight:700;font-size:14px;cursor:pointer;transition:background .15s;font-family:inherit;}
+.btn:hover{background:var(--orange-deep);}
+.btn-soft{background:var(--orange-soft);color:#8b5020;border:1px solid #f0cfae;border-radius:10px;
+  padding:11px 18px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;}
+.btn-soft:hover{background:#fad4be;}
+
+.panel{background:#fff;border:1px solid var(--border);border-radius:16px;padding:22px;
+  box-shadow:var(--shadow);margin:16px 0;}
+.panel h3{margin:0 0 16px;font-size:17px;font-weight:800;color:var(--ink2);}
+
+/* 指标卡 */
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:18px 0;}
+.metric{background:#fff;border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:var(--shadow);}
+.metric .num{font-size:32px;font-weight:800;color:var(--ink);line-height:1;}
+.metric .label{font-size:14px;color:var(--muted);margin-top:8px;}
+
+/* 横向条形图 */
+.barchart .row{display:flex;align-items:center;margin:9px 0;gap:10px;}
+.barchart .name{width:92px;font-size:13px;color:var(--ink3);text-align:right;flex-shrink:0;}
+.barchart .track{flex:1;background:var(--bg);border-radius:8px;height:22px;overflow:hidden;}
+.barchart .fill{height:100%;background:var(--orange);border-radius:8px;}
+.barchart .val{width:34px;font-size:13px;font-weight:700;color:var(--ink2);text-align:left;}
+
+/* 竖向柱状图 */
+.hist{display:flex;align-items:flex-end;gap:16px;height:180px;padding:14px 4px 6px;}
+.hist .col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px;height:100%;}
+.hist .bar{width:64%;background:var(--orange);border-radius:8px 8px 0 0;transition:height .3s;}
+.hist .lab{font-size:12px;color:var(--muted);}
+.hist .cnt{font-size:13px;font-weight:700;color:var(--ink2);}
+
+/* 折线图 */
+.linechart{width:100%;height:auto;display:block;}
+
+/* 试验卡片 */
+.trial{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px 18px;
+  margin:10px 0;box-shadow:var(--shadow);}
+.trial .tt{font-weight:800;font-size:15px;color:var(--ink);}
+.trial .tt a{color:var(--orange-deep);text-decoration:none;}
+.trial .tm{font-size:13px;color:var(--muted);margin-top:5px;}
+.chip{display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:20px;margin-left:8px;
+  background:var(--orange-soft);color:#8b5020;}
+
+/* 表格 */
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th,td{border:1px solid var(--divider);padding:11px 12px;text-align:left;vertical-align:top;}
+th{background:#faf7f2;font-weight:800;color:var(--ink2);}
+td a{color:var(--orange-deep);text-decoration:none;font-weight:700;}
+
+/* tabs */
+.tabs{display:flex;gap:8px;margin:14px 0;}
+.tabbtn{padding:10px 18px;border:1px solid var(--border);border-radius:10px;background:#fff;
+  font-weight:700;font-size:14px;color:var(--ink3);cursor:pointer;}
+.tabbtn.active{background:var(--orange-soft);color:#8b5020;border-color:#f0cfae;}
+.cntab{display:none;}
+.cntab.active{display:block;}
+
+/* 智能助手结果 */
+.answer{background:#fff;border:1px solid var(--border);border-radius:16px;padding:22px;
+  box-shadow:var(--shadow);margin:16px 0;line-height:1.85;font-size:14px;color:var(--ink3);}
+.answer h4{color:var(--ink);margin:14px 0 6px;font-size:15px;}
+.answer ul{margin:6px 0;padding-left:20px;}
+.answer li{margin:5px 0;}
+.trace{background:#faf7f2;border:1px dashed var(--border);border-radius:12px;padding:14px 18px;
+  margin-top:12px;font-size:12px;color:var(--muted);font-family:ui-monospace,Menlo,monospace;}
+textarea.input{min-height:90px;resize:vertical;line-height:1.6;}
+.note{font-size:13px;color:var(--muted);margin:8px 0;}
+@media(max-width:1100px){
+  .layout{flex-direction:column;}
+  .left-card,.right-card{width:100%;height:auto;position:static;}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── 左侧导航 ── -->
+  <aside class="left-card">
+    <div class="navbrand">BD 情报<br><span>药企竞品监测</span></div>
+    <div class="card-divider"></div>
+    <div class="nav-item active" data-view="总览">总览</div>
+    <div class="nav-item" data-view="竞争格局">竞争格局</div>
+    <div class="nav-item" data-view="试验检索">试验检索</div>
+    <div class="nav-item" data-view="每日监测">每日监测</div>
+    <div class="nav-item" data-view="竞品对比">竞品对比</div>
+    <div class="nav-item" data-view="中国管线">中国管线</div>
+    <div class="nav-item" data-view="智能助手">智能助手</div>
+  </aside>
+
+  <!-- ── 中间内容 ── -->
+  <main class="center">
+
+    <!-- 总览 -->
+    <section class="view active" id="view-总览">
+      <div class="viewhead"><h1>总览</h1><div class="sub">一键聚合治疗领域的试验规模、竞争格局与近期动态</div></div>
+      <div class="row-inline">
+        <input class="input" value="NSCLC" placeholder="如 NSCLC, PD-1, CAR-T">
+        <button class="btn">生成看板</button>
+      </div>
+      <div class="metrics">
+        <div class="metric"><div class="num">1,284</div><div class="label">总试验</div></div>
+        <div class="metric"><div class="num">642</div><div class="label">活跃试验</div></div>
+        <div class="metric"><div class="num">37</div><div class="label">近30天新增</div></div>
+        <div class="metric"><div class="num">9</div><div class="label">本周新增</div></div>
+      </div>
+      <div class="panel">
+        <h3>主要申办方 TOP 10</h3>
+        <div class="barchart">
+          <div class="row"><div class="name">恒瑞医药</div><div class="track"><div class="fill" style="width:100%"></div></div><div class="val">86</div></div>
+          <div class="row"><div class="name">百济神州</div><div class="track"><div class="fill" style="width:84%"></div></div><div class="val">72</div></div>
+          <div class="row"><div class="name">信达生物</div><div class="track"><div class="fill" style="width:71%"></div></div><div class="val">61</div></div>
+          <div class="row"><div class="name">君实生物</div><div class="track"><div class="fill" style="width:63%"></div></div><div class="val">54</div></div>
+          <div class="row"><div class="name">默沙东</div><div class="track"><div class="fill" style="width:56%"></div></div><div class="val">48</div></div>
+          <div class="row"><div class="name">罗氏</div><div class="track"><div class="fill" style="width:48%"></div></div><div class="val">41</div></div>
+          <div class="row"><div class="name">阿斯利康</div><div class="track"><div class="fill" style="width:45%"></div></div><div class="val">39</div></div>
+          <div class="row"><div class="name">复宏汉霖</div><div class="track"><div class="fill" style="width:38%"></div></div><div class="val">33</div></div>
+          <div class="row"><div class="name">正大天晴</div><div class="track"><div class="fill" style="width:34%"></div></div><div class="val">29</div></div>
+          <div class="row"><div class="name">礼来</div><div class="track"><div class="fill" style="width:29%"></div></div><div class="val">25</div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>阶段分布</h3>
+        <div class="hist">
+          <div class="col"><div class="cnt">210</div><div class="bar" style="height:55%"></div><div class="lab">I 期</div></div>
+          <div class="col"><div class="cnt">380</div><div class="bar" style="height:100%"></div><div class="lab">II 期</div></div>
+          <div class="col"><div class="cnt">290</div><div class="bar" style="height:76%"></div><div class="lab">III 期</div></div>
+          <div class="col"><div class="cnt">120</div><div class="bar" style="height:32%"></div><div class="lab">IV 期</div></div>
+          <div class="col"><div class="cnt">284</div><div class="bar" style="height:75%"></div><div class="lab">未知</div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>近期重要更新</h3>
+        <div class="trial"><div class="tt"><a href="#">NCT06234901</a><span class="chip">更新</span></div><div class="tm">某 PD-1 联合化疗一线 NSCLC III 期达主要终点 · 2026-07-10</div></div>
+        <div class="trial"><div class="tt"><a href="#">NCT05881234</a><span class="chip">新</span></div><div class="tm">某 ADC 药物 I 期剂量递增启动 · 2026-07-08</div></div>
+        <div class="trial"><div class="tt"><a href="#">NCT06120987</a><span class="chip">更新</span></div><div class="tm">某双抗产品 II 期招募完成 · 2026-07-05</div></div>
+        <div class="trial"><div class="tt"><a href="#">NCT05993421</a><span class="chip">新</span></div><div class="tm">CAR-T 疗法 I 期首次公示 · 2026-07-03</div></div>
+      </div>
+      <button class="btn-soft">★ 加入我的监测</button>
+    </section>
+
+    <!-- 竞争格局 -->
+    <section class="view" id="view-竞争格局">
+      <div class="viewhead"><h1>竞争格局</h1><div class="sub">分析治疗领域的竞争密度：主要玩家与阶段分布</div></div>
+      <div class="row-inline">
+        <input class="input" value="NSCLC" placeholder="治疗领域">
+        <input class="input" placeholder="聚焦申办方（可选）">
+        <button class="btn">生成分析</button>
+      </div>
+      <div class="metrics">
+        <div class="metric"><div class="num">1,284</div><div class="label">总试验</div></div>
+        <div class="metric"><div class="num">642</div><div class="label">活跃试验</div></div>
+        <div class="metric"><div class="num">10</div><div class="label">主要申办方</div></div>
+        <div class="metric"><div class="num">6</div><div class="label">中国药企</div></div>
+      </div>
+      <div class="panel">
+        <h3>主要申办方试验数</h3>
+        <div class="barchart">
+          <div class="row"><div class="name">恒瑞医药</div><div class="track"><div class="fill" style="width:100%"></div></div><div class="val">86</div></div>
+          <div class="row"><div class="name">百济神州</div><div class="track"><div class="fill" style="width:84%"></div></div><div class="val">72</div></div>
+          <div class="row"><div class="name">信达生物</div><div class="track"><div class="fill" style="width:71%"></div></div><div class="val">61</div></div>
+          <div class="row"><div class="name">君实生物</div><div class="track"><div class="fill" style="width:63%"></div></div><div class="val">54</div></div>
+          <div class="row"><div class="name">默沙东</div><div class="track"><div class="fill" style="width:56%"></div></div><div class="val">48</div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>阶段分布</h3>
+        <div class="hist">
+          <div class="col"><div class="cnt">210</div><div class="bar" style="height:55%"></div><div class="lab">I 期</div></div>
+          <div class="col"><div class="cnt">380</div><div class="bar" style="height:100%"></div><div class="lab">II 期</div></div>
+          <div class="col"><div class="cnt">290</div><div class="bar" style="height:76%"></div><div class="lab">III 期</div></div>
+          <div class="col"><div class="cnt">120</div><div class="bar" style="height:32%"></div><div class="lab">IV 期</div></div>
+          <div class="col"><div class="cnt">284</div><div class="bar" style="height:75%"></div><div class="lab">未知</div></div>
+        </div>
+      </div>
+      <div class="row-inline">
+        <button class="btn-soft">★ 加入我的监测</button>
+        <button class="btn">生成 AI 竞争简报</button>
+      </div>
+    </section>
+
+    <!-- 试验检索 -->
+    <section class="view" id="view-试验检索">
+      <div class="viewhead"><h1>试验检索</h1><div class="sub">按疾病 / 靶点 / 公司检索 ClinicalTrials.gov</div></div>
+      <div class="row-inline">
+        <input class="input" value="NSCLC" placeholder="疾病或关键词">
+        <input class="input" placeholder="申办方（可选）">
+        <select class="select"><option>状态（可选）</option><option>RECRUITING</option><option>ACTIVE_NOT_RECRUITING</option><option>COMPLETED</option></select>
+        <button class="btn">检索</button>
+      </div>
+      <div class="note">共 <b>1,284</b> 条结果</div>
+      <div class="trial"><div class="tt"><a href="#">NCT04267848</a><span class="chip">RECRUITING</span></div><div class="tm">默沙东 · III 期 · NSCLC · Pembrolizumab 联合化疗一线治疗 · 2026-06-20</div></div>
+      <div class="trial"><div class="tt"><a href="#">NCT04191356</a><span class="chip">ACTIVE</span></div><div class="tm">百济神州 · III 期 · NSCLC · 替雷利珠单抗单药维持 · 2026-06-18</div></div>
+      <div class="trial"><div class="tt"><a href="#">NCT05551234</a><span class="chip">RECRUITING</span></div><div class="tm">恒瑞医药 · II 期 · NSCLC · 卡瑞利珠单抗联合放疗 · 2026-06-15</div></div>
+      <div class="trial"><div class="tt"><a href="#">NCT05881234</a><span class="chip">RECRUITING</span></div><div class="tm">某 BioTech · I 期 · NSCLC · ADC 药物剂量递增 · 2026-06-12</div></div>
+    </section>
+
+    <!-- 每日监测 -->
+    <section class="view" id="view-每日监测">
+      <div class="viewhead"><h1>每日监测</h1><div class="sub">追踪治疗领域近期新增 / 更新试验</div></div>
+      <div class="row-inline">
+        <input class="input" value="NSCLC" placeholder="治疗领域">
+        <input class="input" style="max-width:120px" value="7" placeholder="天数">
+        <button class="btn">监测</button>
+      </div>
+      <div class="metric" style="max-width:220px"><div class="num">23</div><div class="label">新增 / 更新（近 7 天）</div></div>
+      <div class="panel">
+        <h3>近 7 天更新趋势</h3>
+        <svg class="linechart" viewBox="0 0 460 150">
+          <line x1="30" y1="130" x2="450" y2="130" stroke="#e6e0d6" stroke-width="1"/>
+          <line x1="30" y1="20" x2="30" y2="130" stroke="#e6e0d6" stroke-width="1"/>
+          <polyline points="55,95 110,80 165,60 220,70 275,45 330,50 385,30 440,38"
+            fill="none" stroke="#d98841" stroke-width="2.5"/>
+          <polygon points="55,130 55,95 110,80 165,60 220,70 275,45 330,50 385,30 440,38 440,130"
+            fill="rgba(217,136,65,0.10)"/>
+          <circle cx="55" cy="95" r="3" fill="#d98841"/><circle cx="110" cy="80" r="3" fill="#d98841"/>
+          <circle cx="165" cy="60" r="3" fill="#d98841"/><circle cx="220" cy="70" r="3" fill="#d98841"/>
+          <circle cx="275" cy="45" r="3" fill="#d98841"/><circle cx="330" cy="50" r="3" fill="#d98841"/>
+          <circle cx="385" cy="30" r="3" fill="#d98841"/><circle cx="440" cy="38" r="3" fill="#d98841"/>
+          <text x="55" y="145" font-size="10" fill="#7a756d" text-anchor="middle">07-04</text>
+          <text x="165" y="145" font-size="10" fill="#7a756d" text-anchor="middle">07-06</text>
+          <text x="275" y="145" font-size="10" fill="#7a756d" text-anchor="middle">07-08</text>
+          <text x="385" y="145" font-size="10" fill="#7a756d" text-anchor="middle">07-10</text>
+        </svg>
+      </div>
+      <div class="trial"><div class="tt"><a href="#">NCT06234901</a><span class="chip">更新</span></div><div class="tm">某 PD-1 III 期达主要终点 · 2026-07-10</div></div>
+      <div class="trial"><div class="tt"><a href="#">NCT05993421</a><span class="chip">新</span></div><div class="tm">CAR-T I 期首次公示 · 2026-07-08</div></div>
+      <div class="trial"><div class="tt"><a href="#">NCT06120987</a><span class="chip">更新</span></div><div class="tm">双抗 II 期招募完成 · 2026-07-06</div></div>
+    </section>
+
+    <!-- 竞品对比 -->
+    <section class="view" id="view-竞品对比">
+      <div class="viewhead"><h1>竞品对比</h1><div class="sub">并排对比多个试验：设计 / 终点 / 竞争定位</div></div>
+      <div class="row-inline">
+        <textarea class="input" placeholder="输入 NCT ID（逗号分隔，最多 5 个）">NCT04267848, NCT04191356, NCT05551234</textarea>
+        <button class="btn">对比</button>
+      </div>
+      <div class="panel" style="overflow-x:auto">
+        <h3>试验对比表</h3>
+        <table>
+          <thead><tr><th>NCT</th><th>申办方</th><th>阶段</th><th>状态</th><th>条件</th><th>干预</th><th>主要终点</th></tr></thead>
+          <tbody>
+            <tr><td><a href="#">NCT04267848</a></td><td>默沙东</td><td>III 期</td><td>RECRUITING</td><td>NSCLC</td><td>Pembrolizumab</td><td>OS / PFS</td></tr>
+            <tr><td><a href="#">NCT04191356</a></td><td>百济神州</td><td>III 期</td><td>ACTIVE</td><td>NSCLC</td><td>替雷利珠单抗</td><td>OS</td></tr>
+            <tr><td><a href="#">NCT05551234</a></td><td>恒瑞医药</td><td>II 期</td><td>RECRUITING</td><td>NSCLC</td><td>卡瑞利珠单抗</td><td>ORR</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="answer">
+        <h4>AI 对比分析</h4>
+        <p>三款 NSCLC 药物均聚焦晚期一线治疗，但差异明显：</p>
+        <ul>
+          <li><b>默沙东</b>：全球多中心 III 期、样本量最大，终点含 OS，循证等级最高；</li>
+          <li><b>百济神州</b>：III 期已进入 ACTIVE 状态，主打 PFS 优效，国际化布局；</li>
+          <li><b>恒瑞医药</b>：国内 II 期、进度略慢，但联合放疗差异化定位明确。</li>
+        </ul>
+        <p><b>BD 建议</b>：关注恒瑞联合放疗方案的差异化空白，可作为 license-in 谈判切入点。</p>
+      </div>
+    </section>
+
+    <!-- 中国管线 -->
+    <section class="view" id="view-中国管线">
+      <div class="viewhead"><h1>中国管线</h1><div class="sub">中国药企管线 + CDE 审批进度</div></div>
+      <div class="tabs">
+        <div class="tabbtn active" data-tab="管线">管线检索</div>
+        <div class="tabbtn" data-tab="cde">CDE 审批</div>
+      </div>
+      <div class="cntab active" id="tab-管线">
+        <div class="row-inline">
+          <input class="input" value="NSCLC" placeholder="治疗领域">
+          <button class="btn">检索中国管线</button>
+        </div>
+        <div class="metric" style="max-width:240px"><div class="num">312</div><div class="label">中国药企试验</div></div>
+        <div class="panel">
+          <h3>中国申办方</h3>
+          <div class="trial"><div class="tt">恒瑞医药 <span class="chip">86 项</span></div><div class="tm">覆盖 I–III 期，含 ADC / 双抗多管线</div></div>
+          <div class="trial"><div class="tt">百济神州 <span class="chip">72 项</span></div><div class="tm">国际化 III 期为主，替雷利珠单抗核心</div></div>
+          <div class="trial"><div class="tt">信达生物 <span class="chip">61 项</span></div><div class="tm">PD-1 生态 + 双抗布局</div></div>
+        </div>
+        <div class="note"><a href="#" style="color:var(--orange-deep);font-weight:700;">在 ChiCTR 检索 NSCLC →</a></div>
+      </div>
+      <div class="cntab" id="tab-cde">
+        <div class="row-inline">
+          <input class="input" placeholder="药品名（中 / 英）">
+          <button class="btn">查询 CDE</button>
+        </div>
+        <div class="panel">
+          <h3>CDE 审批进度</h3>
+          <div class="note"><a href="#" style="color:var(--orange-deep);font-weight:700;">CDE 数据查询：某 ADC 药物 →</a></div>
+          <div class="note"><a href="#" style="color:var(--orange-deep);font-weight:700;">药物临床试验登记平台 →</a></div>
+          <div class="trial"><div class="tt"><a href="#">NCT05881234</a><span class="chip">新</span></div><div class="tm">某 ADC 药物 I 期 · 关联中国试验</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 智能助手 -->
+    <section class="view" id="view-智能助手">
+      <div class="viewhead"><h1>智能助手</h1><div class="sub">自由提问，Agent 自动调用工具检索并整合</div></div>
+      <textarea class="input" id="a_query">分析 NSCLC 领域的竞争格局，并列出近期重要更新</textarea>
+      <div class="row-inline"><button class="btn">▶ 运行 Agent</button></div>
+      <div class="answer">
+        <h4>NSCLC 竞争格局简报</h4>
+        <p>NSCLC 是肿瘤免疫治疗竞争最激烈的赛道，全球在研试验 <b>1,284</b> 项，其中活跃 <b>642</b> 项。中国药企参与度高，恒瑞、百济、信达合计占据国内近 40% 管线。</p>
+        <h4>主要玩家布局</h4>
+        <ul>
+          <li><b>跨国药企</b>：默沙东（Pembrolizumab）、罗氏、阿斯利康以 PD-1/L1 基石药物领跑；</li>
+          <li><b>中国头部</b>：百济神州替雷利珠单抗、恒瑞卡瑞利珠单抗已商业化，正向 ADC / 双抗延伸；</li>
+          <li><b>新兴方向</b>：ADC、CAR-T、双抗成为近 30 天新增试验的主要增量。</li>
+        </ul>
+        <h4>BD 策略建议</h4>
+        <ul>
+          <li>关注 ADC 与双抗的差异化联合方案，避开 PD-1 红海；</li>
+          <li>对中国药企早期管线可做 license-in 谈判，窗口期约 12–18 个月。</li>
+        </ul>
+        <div class="trace">Step 1: search_clinical_trials("NSCLC") → 1,284 studies
+Step 2: analyze_competitive_landscape("NSCLC") → top_sponsors × 10
+Step 3: monitor_recent_changes("NSCLC", 30d) → 37 new
+Step 4: synthesize → final_response (above)</div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── 右侧业务快捷 ── -->
+  <aside class="right-card">
+    <div class="righthead">业务快捷</div>
+    <div class="card-divider"></div>
+    <div class="card-section">快捷查询</div>
+    <button class="rbtn qbtn" data-q="CAR-T">CAR-T 细胞疗法</button>
+    <button class="rbtn qbtn" data-q="NSCLC">NSCLC 非小细胞肺癌</button>
+    <button class="rbtn qbtn" data-q="PD-1">PD-1 / PD-L1</button>
+    <button class="rbtn qbtn" data-q="ADC">ADC 抗体偶联药物</button>
+    <div class="card-divider"></div>
+    <div class="card-section">我的监测</div>
+    <button class="rbtn">● NSCLC</button>
+    <button class="rbtn">● PD-1</button>
+    <div class="card-divider"></div>
+    <div class="card-section">最近查询</div>
+    <div class="rhist">NSCLC</div>
+    <div class="rhist">CAR-T</div>
+    <div class="rhist">ADC</div>
+    <div class="rhist">PD-1</div>
+  </aside>
+
+</div>
+
+<script>
+function show(view){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+view).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===view));
+}
+document.querySelectorAll('.nav-item').forEach(n=>{
+  n.addEventListener('click', ()=>show(n.dataset.view));
+});
+// 右栏快捷查询 → 跳智能助手并预填
+document.querySelectorAll('.qbtn').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.getElementById('a_query').value = '分析 '+b.dataset.q+' 领域的竞争格局，并列出近期重要更新';
+    show('智能助手');
+  });
+});
+// 中国管线 tabs
+function showTab(t){
+  document.querySelectorAll('.cntab').forEach(x=>x.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  document.querySelectorAll('.tabbtn').forEach(b=>b.classList.toggle('active', b.dataset.tab===t));
+}
+document.querySelectorAll('.tabbtn').forEach(b=>{
+  b.addEventListener('click', ()=>showTab(b.dataset.tab));
+});
+</script>
+</body>
+</html>
