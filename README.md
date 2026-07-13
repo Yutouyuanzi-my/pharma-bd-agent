@@ -75,7 +75,7 @@ pip install -r requirements.txt
 ```
 
 ### 2. 配置 API Key（二选一）
-- **方式 A（推荐）**：复制 `.env.example` 为 `.env`，填入 `DEEPSEEK_API_KEY`
+- **方式 A（推荐）**：运行 `./run.sh` 会自动生成 `.env`，填入 `DEEPSEEK_API_KEY` 后重跑即可（也可手动创建 `.env`）
 - **方式 B**：直接在 Streamlit 侧边栏输入 API Key（仅当前会话，不保存）
 
 ### 3. （可选）使用 DeepSeek 等兼容端点
