@@ -19,5 +19,10 @@
 - 简历描述见 简历描述.md（三个版本：Agent工程师/医疗AI PM/通用）
 - 已用 git 管理（本地，暂无远程仓库）
 
+## 安全约定
+- **严禁在任何文件（代码 / 记忆 / 文档 / 提交）中写入真实密钥或其片段**，仅用变量名（如 `DEEPSEEK_API_KEY`）指代。
+- 2026-07-13 已发生密钥泄露事故（.env.example 含真实 DeepSeek key，且曾写入 MEMORY.md），已删除 .env.example、改用 run.sh 内置模板生成 .env，并清理全部 git 历史（filter-branch + gc）。
+- 推 GitHub 前仍建议去 DeepSeek 控制台**重置该 key** 以彻底作废；本仓库无远程，key 未公网泄漏。
+
 ## 重要提醒
 - 2026-07-13：发现 .env.example 曾硬编码真实 DeepSeek API Key 且被 git 追踪。已改为占位符、删除该文件并清理全部 git 历史；推 GitHub 前仍建议去 DeepSeek 控制台重置该 key 以彻底作废。因无远程仓库，key 暂未公网泄漏。
