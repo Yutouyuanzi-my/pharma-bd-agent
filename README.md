@@ -1,14 +1,12 @@
 # 🏢 Pharma BD Competitive Intelligence Agent
 
-> AI Agent for pharma BD professionals to monitor competitor pipelines,
-> analyze clinical trial landscapes, and get daily briefings.
->
-> Built for **Agent Engineer** and **AI Medical Product Manager** portfolio.
-> Directly matches 丁香园 job requirement for 竞品监测Agent.
+> An AI Agent that helps pharma Business Development teams monitor competitor
+> clinical pipelines, analyze therapeutic-area landscapes, and generate daily
+> briefings — powered by ClinicalTrials.gov + PubMed and an LLM agent loop.
 
 ## The Problem
 
-Pharma BD teams spend 2-3 hours every morning manually checking 
+Pharma BD teams spend 2–3 hours every morning manually checking
 ClinicalTrials.gov for competitor updates. They need to know:
 
 - What new trials did competitors file this week?
@@ -16,6 +14,17 @@ ClinicalTrials.gov for competitor updates. They need to know:
 - Which companies are entering a new therapeutic area?
 
 This Agent automates that workflow end-to-end.
+
+## What It Does
+
+| Capability | Description |
+|---|---|
+| 🔍 Trial search | Search ClinicalTrials.gov by condition, sponsor/company, and status |
+| 🗺️ Landscape analysis | Structured competitive report: sponsor grouping, phase distribution, LLM analysis |
+| 📡 Change monitoring | Surface new / updated trials in the last N days (daily monitoring) |
+| ⚖️ Side-by-side compare | Compare up to 5 trials on design, endpoints, competitive positioning |
+| 📚 Literature context | Pull PubMed literature for mechanisms and targets |
+| 🇨🇳 China pipeline | China sponsors + CDE approval lookup (ChiCTR / CDE portals) |
 
 ## Architecture
 
@@ -29,17 +38,6 @@ flowchart LR
     LLM -->|base_url 可切换端点| EP[API 端点]
 ```
 > 纯 function-calling 实现，无 Agent 框架依赖；通过 `DEEPSEEK_BASE_URL` 兼容任意 OpenAI 协议端点（默认 DeepSeek）。
-
-### Tools
-
-| Tool | Purpose |
-|---|---|
-| `search_clinical_trials` | Search by condition, sponsor/company, and status |
-| `analyze_competitive_landscape` | Full landscape report: sponsor grouping, phase distribution, LLM analysis |
-| `monitor_recent_changes` | Find new/updated trials in the last N days (daily monitoring) |
-| `compare_trials_side_by_side` | Compare up to 5 trials on design, endpoints, competitive positioning |
-| `get_trial_detail` | Full protocol for a specific NCT ID |
-| `search_pubmed` | Scientific literature for context on mechanisms and targets |
 
 ### Agent Workflow
 
@@ -61,7 +59,7 @@ Return structured report (in Chinese or English)
 
 | Decision | Rationale |
 |---|---|
-| **No agent framework** | Pure OpenAI function calling. Shows I understand the underlying mechanism, not just how to drag nodes. |
+| **No agent framework** | Pure OpenAI function calling. Demonstrates understanding of the underlying mechanism, not just how to drag nodes. |
 | **ClinicalTrials.gov v2 advanced query** | Supports `AREA[Sponsor]` and `AREA[LastUpdatePostDate]RANGE` for sponsor filtering and time-based monitoring. |
 | **Chinese output support** | The target users (Chinese pharma BD) operate in Chinese. Agent outputs in the user's language. |
 | **Streamlit frontend** | Fast iteration, deployable to Streamlit Cloud for free. Preset buttons for common BD queries. |
@@ -69,52 +67,37 @@ Return structured report (in Chinese or English)
 
 ## Quick Start
 
-### 1. 安装依赖
+### 1. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. 配置 API Key（二选一）
-- **方式 A（推荐）**：运行 `./run.sh` 会自动生成 `.env`，填入 `DEEPSEEK_API_KEY` 后重跑即可（也可手动创建 `.env`）
-- **方式 B**：直接在 Streamlit 侧边栏输入 API Key（仅当前会话，不保存）
+### 2. Configure API Key (choose one)
+- **Option A (recommended)**: Run `./run.sh` — it auto-generates `.env`, then fill in `DEEPSEEK_API_KEY` and re-run.
+- **Option B**: Enter the API Key directly in the Streamlit sidebar (current session only, not saved).
 
-### 3. （可选）使用 DeepSeek 等兼容端点
-在 `.env` 中设置：
+### 3. (Optional) Use DeepSeek or any compatible endpoint
+In `.env`:
 ```
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-chat
 ```
-界面侧边栏同样支持手动填写 Base URL 与自定义模型名，无需改代码。
+The sidebar also supports manual Base URL and custom model name — no code changes needed.
 
-### 4. 启动
+### 4. Launch
 ```bash
 streamlit run app.py
 ```
 
-试试这些查询：
+Try queries like:
 
 - "分析 NSCLC 的竞争格局"
 - "过去一周 CAR-T 有什么新临床试验？"
 - "AstraZeneca 在乳腺癌领域有什么布局？"
 
-## Portfolio Usage
-
-### For Agent Engineer Interviews
-
-- **Show the trace**: Open "Agent trace" — multi-step function calling with real clinical data.
-- **Talk about tool design**: Why `monitor_recent_changes` does two API calls (new + updated), how `analyze_competitive_landscape` structures the data before calling LLM.
-- **Mention the IP block workaround**: ClinicalTrials.gov blocks cloud IPs — the agent can use a local relay. Shows awareness of deployment constraints.
-
-### For AI Medical Product Interviews
-
-- **User story**: "Pharma BD needs daily competitor monitoring — this agent saves 2+ hours/day."
-- **Market fit**: Directly maps to real job requirements (丁香园 竞品监测Agent).
-- **Evaluation metrics**: Coverage (missed trials), timeliness (within 24h of posting), accuracy of competitive analysis.
-- **Business model**: Pharma companies pay for CI tools. This could be a SaaS product.
-
 ## Roadmap
 
-- [ ] 演示 GIF / 截图（放进 README，增强作品可读性）
+- [ ] 演示 GIF / 截图（放进 README，增强可读性）
 - [ ] 工具层单元测试
 - [ ] Email/Slack daily briefing delivery
 - [ ] Personalized watchlist (track specific sponsors + conditions)

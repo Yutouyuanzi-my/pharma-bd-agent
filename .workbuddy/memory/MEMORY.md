@@ -1,9 +1,7 @@
 # 项目：药企 BD 竞品监测 Agent
 
-## 项目定位
-- 用途：马源转行求职作品，目标岗位 Agent工程师 / 医疗AI产品经理
-- 对标：丁香园「竞品监测Agent」JD
-- 场景：药企BD自动监测 ClinicalTrials.gov 竞争对手临床试验动态
+## 项目简介
+- 场景：药企 BD 自动监测 ClinicalTrials.gov 竞争对手临床试验动态，输出竞争格局、近期动态、竞品对比与 AI 简报。
 
 ## 技术架构
 - 主力实现：纯 Python + OpenAI Function Calling（无 Agent 框架），文件 agent.py
@@ -16,13 +14,12 @@
 ## 项目约定
 - 代码注释用中文；PRD 有中英双语（PRD.md 英文 / PRD.zh-CN.md 中文）
 - Dify 只有指南文档 dify-workflow-guide.md，未实际搭建
-- 简历描述见 简历描述.md（三个版本：Agent工程师/医疗AI PM/通用）
-- 已用 git 管理（本地，暂无远程仓库）
+- 已推送到 GitHub（public）：https://github.com/Yutouyuanzi-my/pharma-bd-agent
 
 ## 安全约定
 - **严禁在任何文件（代码 / 记忆 / 文档 / 提交）中写入真实密钥或其片段**，仅用变量名（如 `DEEPSEEK_API_KEY`）指代。
-- 2026-07-13 已发生密钥泄露事故（.env.example 含真实 DeepSeek key，且曾写入 MEMORY.md），已删除 .env.example、改用 run.sh 内置模板生成 .env，并清理全部 git 历史（filter-branch + gc）。
-- 推 GitHub 前仍建议去 DeepSeek 控制台**重置该 key** 以彻底作废；本仓库无远程，key 未公网泄漏。
+- 2026-07-13 发生过密钥泄露事故（.env.example 含真实 DeepSeek key，且曾写入 MEMORY.md），已删除 .env.example、改用 run.sh 内置模板生成 .env，并清理全部 git 历史（filter-branch + gc）。
+- 建议去 DeepSeek 控制台**重置该 key** 以彻底作废；仓库现已公开，但密钥从未出现在任何提交中（历史已清理）。
 
 ## 重要提醒
-- 2026-07-13：发现 .env.example 曾硬编码真实 DeepSeek API Key 且被 git 追踪。已改为占位符、删除该文件并清理全部 git 历史；推 GitHub 前仍建议去 DeepSeek 控制台重置该 key 以彻底作废。因无远程仓库，key 暂未公网泄漏。
+- 2026-07-13：发现 .env.example 曾硬编码真实 DeepSeek API Key 且被 git 追踪。已改为占位符、删除该文件并清理全部 git 历史；建议去 DeepSeek 控制台重置该 key 以彻底作废。仓库已公开，密钥从未出现在任何提交中。

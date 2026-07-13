@@ -1,8 +1,7 @@
 # Dify 工作流模板：竞品监测 Agent
 
-> 适用于 Dify Cloud（dify.ai）网页版，与 Python Agent 逻辑一致。
-> 面试时可展示同一产品在两种技术栈下的实现。
-> 丁香园 JD 中 "竞品监测Agent" 的直接对应实现。
+> 适用于 Dify Cloud（dify.ai）网页版，与 Python Agent 的逻辑一致。
+> 可作为 Python 工程实现之外的低代码对照方案，复用同一套数据源与工具逻辑。
 
 ## 工作流结构
 
@@ -95,7 +94,7 @@ URL: https://clinicaltrials.gov/api/v2/studies?query.adv=AREA[Condition]:"{{cond
 | 竞品监测 | `monitor_recent_changes` 查新+更新 | 两个 HTTP 节点分别查 |
 | 格局分析 | `analyze_competitive_landscape` 自动分组 | 代码节点手动分组 |
 | 调试性 | 代码断点 | Dify 日志面板 |
-| 面试价值 | 工程能力（底层 Agent 机制） | 产品能力（快速验证能力） |
+| 能力体现 | 展现底层 Agent 机制的实现能力 | 展现低代码快速搭建的能力 |
 
 ## 导入方式
 
@@ -104,11 +103,3 @@ URL: https://clinicaltrials.gov/api/v2/studies?query.adv=AREA[Condition]:"{{cond
 3. 填写 URL 和 Prompt
 4. 建议用「聊天流」类型，保持对话上下文
 5. 发布后可通过 API 或嵌入使用
-
-## 面试话术
-
-> "这个竞品监测 Agent 直接命中了我投递的 JD 需求。我做了两个版本：
-> Python 工程版展示了自己实现 Agent 框架的能力（tool registration、
-> function calling loop、状态追踪），Dify 版展示了自己做产品
-> 快速验证的能力。两者用同一个数据源和同样的工具逻辑，
-> 但架构完全不同——这证明我能根据场景选对技术栈。"

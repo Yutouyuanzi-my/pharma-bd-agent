@@ -82,4 +82,4 @@ Chinese-first output, async-ready tool layer.
 2. ⬜ User testing with 3 pharma BD professionals
 3. ⬜ Automated daily briefing delivery (cron + email)
 4. ⬜ Multi-source: EUCTR + ChiCTR integration
-5. ⬜ Dify workflow parallel build (for PM validation)
+5. ⬜ Dify workflow parallel build (for solution validation)
