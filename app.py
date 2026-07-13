@@ -172,13 +172,8 @@ CSS = """
 .viewhead h1 { font-size:30px; font-weight:800; color:#1a1816; margin:0 0 4px; letter-spacing:-0.3px; }
 .viewhead .sub { font-size:14px; color:#6b6560; margin-top:4px; }
 
-/* ── 右侧栏容器：整列白底，与左侧 BD 情报统一，靠白色与中间米色区隔 ── */
-div[data-testid="column"]:last-child > [data-testid="stVerticalBlock"] {
-    background:#ffffff !important;
-}
-
-/* ── 通用卡片容器（左导航 / 右快捷栏）── */
-/* 纯白底无框：仅靠白底色与页面浅米色(#f4f1ec)自然区隔，无边框无阴影 */
+/* ── 通用卡片容器（左导航）── */
+/* 左侧 sidebar 已白底，卡片仅用于 padding */
 .card {
     background:#ffffff;
     border:none;
@@ -187,7 +182,16 @@ div[data-testid="column"]:last-child > [data-testid="stVerticalBlock"] {
     box-shadow:none;
 }
 .nav-card { margin:0; height:100%; }
-.right-card { margin:0; }
+
+/* 右侧栏：整列白底，与 sidebar 统一，去掉 card 嵌套白块 */
+[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child,
+[data-testid="stColumn"]:last-child {
+    background: #ffffff !important;
+}
+[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child > [data-testid="stVerticalBlock"] {
+    padding: 24px 20px !important;
+}
+
 /* 卡片内大区块细分割线（仅区隔大区块，不分割单条按钮 / 列表项） */
 .card-divider {
     height:0; border:0; border-top:1px solid #e6e0d6;
@@ -659,7 +663,6 @@ def render_assistant():
 
 # ── 右侧业务快捷栏 ──
 def render_right_bar():
-    st.markdown('<div class="card right-card">', unsafe_allow_html=True)
     st.markdown('<div class="righthead">业务快捷</div>', unsafe_allow_html=True)
     st.markdown('<div class="card-divider"></div>', unsafe_allow_html=True)
     st.markdown('<div class="card-section">快捷查询</div>', unsafe_allow_html=True)
@@ -684,7 +687,6 @@ def render_right_bar():
     st.markdown('<div class="card-section">最近查询</div>', unsafe_allow_html=True)
     for r in st.session_state.recent[::-1][:6]:
         st.markdown(f'<div class="rhist">{r}</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ── 主结构 ──
