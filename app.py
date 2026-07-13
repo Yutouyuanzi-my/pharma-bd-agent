@@ -121,9 +121,23 @@ register_tool("search_cde_approvals", search_cde_approvals, {
     },
 })
 
-# ── 客户端 ──
-MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
-client = OpenAI(api_key=os.getenv("DEEPSEEK_API_KEY"), base_url=os.getenv("DEEPSEEK_BASE_URL"))
+# ── 客户端（兼容本地 .env 与 Streamlit Cloud 密钥）──
+def _get_cfg(key: str, default=None):
+    """读取配置：优先 Streamlit Cloud 密钥（st.secrets），其次本地环境变量（.env）。
+
+    这样同一份代码既能本地 `streamlit run app.py` 跑，也能直接部署到 Streamlit Cloud：
+    本地靠 .env 注入环境变量；云端在 Streamlit Cloud 控制台的 Secrets 里配置同名键值即可。
+    """
+    try:
+        val = st.secrets.get(key)
+        if val:
+            return val
+    except Exception:
+        pass
+    return os.getenv(key, default)
+
+MODEL = _get_cfg("DEEPSEEK_MODEL", "deepseek-chat")
+client = OpenAI(api_key=_get_cfg("DEEPSEEK_API_KEY"), base_url=_get_cfg("DEEPSEEK_BASE_URL"))
 
 # ── 主题 ──
 MORANDI = ["#d98841", "#a7b3a0", "#9bb0bd", "#cfa3a3", "#d8c3a5", "#b3a7b3", "#9bb0a8", "#c9b8a8"]
@@ -641,8 +655,8 @@ def render_assistant():
     if st.button("▶ 运行 Agent", type="primary", key="a_btn"):
         if not query.strip():
             st.error("请输入查询")
-        elif not os.getenv("DEEPSEEK_API_KEY"):
-            st.error("未在 .env 中找到 DEEPSEEK_API_KEY。")
+        elif not _get_cfg("DEEPSEEK_API_KEY"):
+            st.error("未配置 API Key：请在 .env 或 Streamlit Cloud 的 Secrets 中设置 DEEPSEEK_API_KEY。")
         else:
             _push_recent(query.strip())
             with st.spinner("Agent 思考中..."):
