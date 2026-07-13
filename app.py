@@ -131,7 +131,7 @@ MORANDI = ["#d98841", "#a7b3a0", "#9bb0bd", "#cfa3a3", "#d8c3a5", "#b3a7b3", "#9
 CSS = """
 <style>
 [data-testid="stAppViewContainer"] { background:#f4f1ec; }
-[data-testid="stSidebar"] { background:#ffffff; border-right:0.5px solid #e8e3db; min-width:260px !important; width:260px !important; }
+[data-testid="stSidebar"] { background:#ffffff; border:none; min-width:260px !important; width:260px !important; }
 
 /* ── 导航 radio ── */
 [data-testid="stRadio"] { padding:8px 6px 16px; }
@@ -173,16 +173,16 @@ CSS = """
 .viewhead .sub { font-size:14px; color:#6b6560; margin-top:4px; }
 
 /* ── 通用卡片容器（左导航 / 右快捷栏）── */
-/* 左右两侧视觉规格完全统一：白底 + 大圆角 + 柔和阴影 + 充足内边距 */
+/* 纯白底无框：仅靠白底色与页面浅米色(#f4f1ec)自然区隔，无边框无阴影 */
 .card {
     background:#ffffff;
-    border:1px solid #e8e3db;
-    border-radius:18px;
+    border:none;
+    border-radius:0;
     padding:28px 26px;
-    box-shadow:0 2px 14px rgba(54,44,34,0.07);
+    box-shadow:none;
 }
-.nav-card { margin:14px 14px; }
-.right-card { margin:14px 0 14px 4px; }
+.nav-card { margin:0; height:100%; }
+.right-card { margin:0; }
 /* 卡片内大区块细分割线（仅区隔大区块，不分割单条按钮 / 列表项） */
 .card-divider {
     height:0; border:0; border-top:1px solid #e6e0d6;
