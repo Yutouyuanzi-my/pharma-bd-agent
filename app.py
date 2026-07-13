@@ -172,9 +172,9 @@ CSS = """
 .viewhead h1 { font-size:30px; font-weight:800; color:#1a1816; margin:0 0 4px; letter-spacing:-0.3px; }
 .viewhead .sub { font-size:14px; color:#6b6560; margin-top:4px; }
 
-/* ── 右侧栏容器：去掉自带的白色背景块 ── */
+/* ── 右侧栏容器：整列白底，与左侧 BD 情报统一，靠白色与中间米色区隔 ── */
 div[data-testid="column"]:last-child > [data-testid="stVerticalBlock"] {
-    background:transparent !important;
+    background:#ffffff !important;
 }
 
 /* ── 通用卡片容器（左导航 / 右快捷栏）── */
