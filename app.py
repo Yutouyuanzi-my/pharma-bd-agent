@@ -141,14 +141,18 @@ CSS = """
     padding: 28px 22px !important;
 }
 
-/* ── 右侧 column：白色圆角卡片，上下布满页面 ── */
+/* ── 右侧 column：白色圆角卡片，上下固定布满页面 ── */
 [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child,
 [data-testid="stColumn"]:last-child {
     background: #ffffff !important;
     border:1px solid #e5e0d8;
     border-radius:20px;
     box-shadow:0 2px 16px rgba(54,44,34,0.06);
-    min-height: 100vh;
+    height: 100vh !important;
+    position: sticky !important;
+    top: 0 !important;
+    align-self: flex-start !important;
+    overflow-y: auto !important;
 }
 [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child > [data-testid="stVerticalBlock"] {
     padding: 28px 22px !important;
