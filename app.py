@@ -148,6 +148,7 @@ CSS = """
     border:1px solid #e5e0d8;
     border-radius:20px;
     box-shadow:0 2px 16px rgba(54,44,34,0.06);
+    min-height: 100vh;
 }
 [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child > [data-testid="stVerticalBlock"] {
     padding: 28px 22px !important;
