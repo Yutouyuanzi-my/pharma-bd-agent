@@ -4,6 +4,8 @@
 > clinical pipelines, analyze therapeutic-area landscapes, and generate daily
 > briefings — powered by ClinicalTrials.gov + PubMed and an LLM agent loop.
 
+**🚀 Live Demo:** https://pharma-bd-agent-bkgjqphxzeyqe8nwqzaxgt.streamlit.app
+
 ## The Problem
 
 Pharma BD teams spend 2–3 hours every morning manually checking
