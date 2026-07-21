@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- 任务名（唯一即可） -->
+    <key>Label</key>
+    <string>com.pharmabd.dailybrief</string>
+
+    <!-- 要执行的命令：用项目的 venv python 跑脚本的 --once 模式 -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/ABSOLUTE/PATH/TO/.venv/bin/python</string>
+        <string>/ABSOLUTE/PATH/TO/药企 BD 竞品监测 Agent/daily_brief_email.py</string>
+        <string>--once</string>
+    </array>
+
+    <!-- 触发时间：每天 08:00（Hour/Minute 可改） -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>8</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <!-- 工作目录（脚本里相对路径依赖它） -->
+    <key>WorkingDirectory</key>
+    <string>/ABSOLUTE/PATH/TO/药企 BD 竞品监测 Agent</string>
+
+    <!-- 日志（排错用） -->
+    <key>StandardOutPath</key>
+    <string>/tmp/pharmabd_brief.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/pharmabd_brief.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>
+<!--
+使用方法（终端执行，需先把上面两个 /ABSOLUTE/PATH/TO/... 替换为真实路径）：
+
+  # 1. 复制模板到 LaunchAgents
+  cp com.pharmabd.dailybrief.plist ~/Library/LaunchAgents/
+
+  # 2. 加载（开机自启，每天 08:00 跑）
+  launchctl load ~/Library/LaunchAgents/com.pharmabd.dailybrief.plist
+
+  # 3. 立即手动跑一次测试（不加载也行）
+  /ABSOLUTE/PATH/TO/.venv/bin/python /ABSOLUTE/PATH/TO/药企\ BD\ 竞品监测\ Agent/daily_brief_email.py --once
+
+  # 4. 查看日志
+  cat /tmp/pharmabd_brief.log
+
+  # 卸载：launchctl unload ~/Library/LaunchAgents/com.pharmabd.dailybrief.plist
+
+注意：脚本从 .env 读取所有密钥与配置，本文件不含任何明文密码。
+-->

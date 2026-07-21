@@ -97,11 +97,62 @@ Try queries like:
 - "过去一周 CAR-T 有什么新临床试验？"
 - "AstraZeneca 在乳腺癌领域有什么布局？"
 
+## Automated Daily Briefing (Email)
+
+除了交互式 UI，项目还提供**无人值守的每日简报邮件推送**：定时抓取监控领域的近期变动，
+结合竞争格局分析，自动生成 Markdown 简报并发送到指定邮箱。复用同一套工具层
+（`monitor_recent_changes` + `analyze_competitive_landscape`），无需重写逻辑。
+
+### 配置（`.env` 追加以下项，均不硬编码）
+
+```bash
+# 发件 SMTP（以 QQ 邮箱为例，密码填「授权码」而非登录密码）
+SMTP_HOST=smtp.qq.com
+SMTP_PORT=465
+SMTP_USER=your_mail@qq.com
+SMTP_PASSWORD=your_smtp_auth_code
+EMAIL_TO=bd-team@company.com
+
+# 监控领域（逗号分隔）与回溯天数
+MONITOR_CONDITIONS=NSCLC,PD-1,ADC
+MONITOR_SINCE_DAYS=7
+
+# 每日发送时间（定时循环模式用，默认 08:00）
+BRIEF_TIME=08:00
+```
+
+### 运行
+
+```bash
+# 立即跑一次并真正发邮件（测试）
+python daily_brief_email.py --once
+
+# 仅生成本地预览 HTML，不发送（无需配置 SMTP 也能看效果）
+python daily_brief_email.py --dry-run
+
+# 进入定时循环：每天 BRIEF_TIME 自动发送（依赖 schedule 库）
+python daily_brief_email.py
+```
+
+### 定时触发（推荐用系统级任务，比进程常驻更稳）
+
+- **macOS**：加载仓库内的 `com.pharmabd.dailybrief.plist`（launchd，每天 08:00 调 `--once`），
+  先把文件里的 `/ABSOLUTE/PATH/TO/...` 替换成真实路径，再：
+  ```bash
+  cp com.pharmabd.dailybrief.plist ~/Library/LaunchAgents/
+  launchctl load ~/Library/LaunchAgents/com.pharmabd.dailybrief.plist
+  ```
+- **Linux / 服务器**：`crontab -e` 加 `0 8 * * * /path/.venv/bin/python /path/daily_brief_email.py --once`
+- **Windows**：任务计划程序，触发器设为每天 08:00，操作指向 `daily_brief_email.py --once`
+
+> 内置「无变动不发送」逻辑：当所有监控领域在回溯窗口内均无新增/更新试验时，本次不发送邮件，避免每日空报到。
+
 ## Roadmap
 
 - [ ] 演示 GIF / 截图（放进 README，增强可读性）
 - [ ] 工具层单元测试
-- [ ] Email/Slack daily briefing delivery
+- [x] Email daily briefing delivery
+- [ ] Slack / 钉钉 webhook 推送（与邮件并行）
 - [ ] Personalized watchlist (track specific sponsors + conditions)
 - [ ] Multi-source: add EU Clinical Trials Register, ChiCTR
 - [ ] FastAPI + cron deployment for real monitoring

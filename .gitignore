@@ -10,3 +10,9 @@ venv/
 
 # 系统文件
 .DS_Store
+
+# 自动化邮件预览产物（测试用，非源码）
+daily_brief_preview.html
+
+# launchd 日志
+/tmp/pharmabd_brief.log
