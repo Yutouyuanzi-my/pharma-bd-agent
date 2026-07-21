@@ -378,15 +378,15 @@ def _args_short(args: dict) -> str:
 
 
 def _stream_agent(text_slot, status_slot, query, store_key=None, max_rounds=8):
-    """在给定占位元素上流式展示 Agent 输出（打字机效果 + 工具进度）。
+    """在给定占位元素上流式展示 Agent 输出（仅显示最终文本，隐藏中间工具进度）。
 
-    text_slot / status_slot 应为 st.empty() 占位元素；流式过程中实时更新，
-    文本逐段出现，工具调用实时列出进度，结束后再把完整结果存入 session_state。
+    text_slot / status_slot 应为 st.empty() 占位元素；流式过程中文本逐段出现，
+    工具调用进度不再显示在状态区，仅在返回的 trace 中保留，供折叠面板查看。
     """
     buf = ""
     last_render = 0
-    log_lines = []
     text_slot.markdown("🤔 分析中...")
+    status_slot.markdown("正在调用工具检索数据...")
 
     for ev in run_agent_stream(query, client=client, model=MODEL,
                                max_tool_rounds=max_rounds, verbose=False):
@@ -396,17 +396,13 @@ def _stream_agent(text_slot, status_slot, query, store_key=None, max_rounds=8):
             if len(buf) - last_render >= 12:
                 text_slot.markdown(_linkify(buf), unsafe_allow_html=True)
                 last_render = len(buf)
-        elif ev["type"] == "tool_start":
-            log_lines.append(f"🔧 调用 `{ev['tool']}` · `{_args_short(ev.get('args', {}))}`")
-            status_slot.markdown("\n".join(log_lines))
-        elif ev["type"] == "tool_done":
-            log_lines.append(f"✅ `{ev['tool']}` 完成")
-            status_slot.markdown("\n".join(log_lines))
         elif ev["type"] == "error":
             text_slot.error(ev["text"])
+            status_slot.empty()
             return None
         elif ev["type"] == "final":
             text_slot.markdown(_linkify(buf) or ev["text"], unsafe_allow_html=True)
+            status_slot.empty()  # 清除“分析中”提示
             if store_key:
                 st.session_state[store_key] = {"final_response": ev["text"], "trace": ev["trace"]}
             return ev.get("trace")
