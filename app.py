@@ -29,7 +29,14 @@ from tools import (
     search_cde_approvals,
     _CHINESE_SPONSOR_PATTERNS,
 )
-from agent import register_tool, run_agent_stream
+try:
+    from agent import register_tool, run_agent_stream
+except Exception as _import_err:
+    import traceback
+    raise ImportError(
+        f"Failed to import agent: {type(_import_err).__name__}: {_import_err}\n"
+        f"{traceback.format_exc()}"
+    ) from _import_err
 from openai import OpenAI
 
 # ── 工具注册（供 智能助手 的 Agent 调用）──
