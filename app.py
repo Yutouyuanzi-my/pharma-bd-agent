@@ -29,7 +29,7 @@ from tools import (
     search_cde_approvals,
     _CHINESE_SPONSOR_PATTERNS,
 )
-from agent import register_tool, run_agent
+from agent import register_tool, run_agent_stream
 from openai import OpenAI
 
 # ── 工具注册（供 智能助手 的 Agent 调用）──
@@ -361,6 +361,51 @@ def _viewhead(title, sub):
     return f'<div class="viewhead"><h1>{title}</h1><div class="sub">{sub}</div></div>'
 
 
+def _args_short(args: dict) -> str:
+    """把工具参数压缩成一行短文本，用于流式进度展示。"""
+    try:
+        s = json.dumps(args, ensure_ascii=False)
+    except Exception:
+        s = str(args)
+    return s[:80]
+
+
+def _stream_agent(text_slot, status_slot, query, store_key=None, max_rounds=8):
+    """在给定占位元素上流式展示 Agent 输出（打字机效果 + 工具进度）。
+
+    text_slot / status_slot 应为 st.empty() 占位元素；流式过程中实时更新，
+    文本逐段出现，工具调用实时列出进度，结束后再把完整结果存入 session_state。
+    """
+    buf = ""
+    last_render = 0
+    log_lines = []
+    text_slot.markdown("🤔 分析中...")
+
+    for ev in run_agent_stream(query, client=client, model=MODEL,
+                               max_tool_rounds=max_rounds, verbose=False):
+        if ev["type"] == "content":
+            buf += ev["text"]
+            # 节流：每积累约 12 字刷新一次，避免高频重渲染导致卡顿
+            if len(buf) - last_render >= 12:
+                text_slot.markdown(_linkify(buf), unsafe_allow_html=True)
+                last_render = len(buf)
+        elif ev["type"] == "tool_start":
+            log_lines.append(f"🔧 调用 `{ev['tool']}` · `{_args_short(ev.get('args', {}))}`")
+            status_slot.markdown("\n".join(log_lines))
+        elif ev["type"] == "tool_done":
+            log_lines.append(f"✅ `{ev['tool']}` 完成")
+            status_slot.markdown("\n".join(log_lines))
+        elif ev["type"] == "error":
+            text_slot.error(ev["text"])
+            return None
+        elif ev["type"] == "final":
+            text_slot.markdown(_linkify(buf) or ev["text"], unsafe_allow_html=True)
+            if store_key:
+                st.session_state[store_key] = {"final_response": ev["text"], "trace": ev["trace"]}
+            return ev.get("trace")
+    return None
+
+
 # ── 各视图渲染 ──
 def render_overview():
     # 懒加载：只在用户点「生成看板」时才导入重库，首页秒开
@@ -476,16 +521,15 @@ def render_landscape():
         _add_watch(cond.strip())
 
     if st.button("生成 AI 竞争简报", key="l_ai"):
-        with st.spinner("AI 撰写中..."):
-            out = run_agent(
+        if not _get_cfg("DEEPSEEK_API_KEY"):
+            st.error("未配置 API Key：请在 .env 或 Streamlit Cloud 的 Secrets 中设置 DEEPSEEK_API_KEY。")
+        else:
+            out_box = st.empty()
+            st_box = st.empty()
+            _stream_agent(out_box, st_box,
                 f"请用中文撰写 {cond.strip()} 竞争格局简报：主要玩家管线布局、各阶段竞争密度、"
                 f"值得关注的趋势或空白领域、给 BD 团队的策略建议。",
-                client=client, model=MODEL, verbose=False)
-        final = out.get("final_response", "")
-        if final:
-            st.markdown(_linkify(final))
-        else:
-            st.info("未能生成简报。")
+                max_rounds=8)
 
 
 def render_search():
@@ -659,10 +703,18 @@ def render_assistant():
             st.error("未配置 API Key：请在 .env 或 Streamlit Cloud 的 Secrets 中设置 DEEPSEEK_API_KEY。")
         else:
             _push_recent(query.strip())
-            with st.spinner("Agent 思考中..."):
-                result = run_agent(query.strip(), client=client, model=MODEL,
-                                   max_tool_rounds=8, verbose=False)
-            st.session_state.assistant_result = result
+            answer = st.empty()   # 流式答案占位
+            status = st.empty()   # 工具进度占位
+            _stream_agent(answer, status, query.strip(),
+                          store_key="assistant_result", max_rounds=8)
+            # 流式结束后展示 trace 折叠面板
+            result = st.session_state.get("assistant_result")
+            if result and result.get("trace"):
+                with st.expander("Agent trace（工具调用与推理）", expanded=False):
+                    for i, step in enumerate(result["trace"]):
+                        st.markdown(f"**Step {i+1}**: `{step['tool']}`")
+                        st.json(step.get("arguments", {}))
+            return
     result = st.session_state.assistant_result
     if not result:
         st.info("输入查询并运行 Agent，或使用右侧快捷查询。")

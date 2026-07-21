@@ -261,3 +261,233 @@ def run_agent(
         "final_response": "Agent reached maximum tool call rounds.",
         "trace": trace,
     }
+
+
+# ──────────────────────────────────────────────
+# Agent 运行器（流式版）
+# ──────────────────────────────────────────────
+
+def run_agent_stream(
+    user_query: str,
+    client: OpenAI,
+    model: str = "gpt-4o-mini",
+    max_tool_rounds: int = 15,
+    verbose: bool = True,
+):
+    """流式版 Agent 循环：边推理边把文本 / 工具调用作为事件 yield 出去。
+
+    与 ``run_agent`` 的区别：不再等全部结束才返回，而是把中间过程
+    实时推送出来（适合 Streamlit 等需要「打字机」效果的前端）。
+
+    Yields dict events:
+        {"type": "content", "text": str}                 # 流式文本片段（推理或最终回答）
+        {"type": "tool_start", "tool": str, "args": dict}  # 开始调用工具
+        {"type": "tool_done", "tool": str, "preview": str} # 工具返回（截断预览）
+        {"type": "final", "text": str, "trace": list}    # 正常结束，附完整轨迹
+        {"type": "error", "text": str}                   # 致命错误（如凭证问题）
+    """
+    system_prompt = (
+        "You are a pharma competitive intelligence analyst assistant. "
+        "Your users are BD (Business Development) professionals at pharma companies "
+        "who need to monitor competitor pipelines on ClinicalTrials.gov.\n\n"
+        "Available TOOLS and when to use them:\n"
+        "1. search_clinical_trials — default tool. Searches by condition, sponsor/company, and status. "
+        "Use this when the user asks about a specific company's pipeline or a therapeutic area.\n"
+        "2. get_trial_detail — when you need the full protocol for a specific NCT ID.\n"
+        "3. analyze_competitive_landscape — the power tool. Takes a condition (optionally a specific "
+        "sponsor), and produces a structured competitive landscape report: who's doing what, "
+        "phase distribution, competitor mapping. Use this for landscape overview requests.\n"
+        "4. monitor_recent_changes — for daily/weekly monitoring. Checks what's new or updated "
+        "in a therapeutic area in the last N days. Use when the user asks 'what's new' or "
+        "'any updates in the last week'.\n"
+        "5. compare_trials_side_by_side — takes up to 5 NCT IDs and produces a side-by-side "
+        "comparison. Use when the user wants to compare specific competitor trials.\n"
+        "6. search_pubmed — for scientific literature context on mechanisms, drugs, or targets.\n"
+        "7. search_chinese_pipeline — when the user asks about Chinese pharma companies (BeiGene, Hengrui, Innovent, etc.) or Chinese domestic pipeline data. Filters ClinicalTrials.gov for Chinese sponsors.\n"
+        "8. search_cde_approvals — when the user asks about CDE (China NMPA drug review) approval status or China regulatory pipeline for a specific drug. Provides links to CDE data platform.\n\n"
+        "Workflow:\n"
+        "1. Start with search_clinical_trials (by condition or condition+sponsor).\n"
+        "2. For landscape analysis, call analyze_competitive_landscape directly.\n"
+        "3. For monitoring, call monitor_recent_changes.\n"
+        "4. Supplement with PubMed if the user asks about scientific rationale.\n"
+        "5. Synthesize findings into a clear, structured report (in Chinese if the user writes in Chinese).\n\n"
+        "IMPORTANT: Your output should be structured like a BD morning briefing — concise, "
+        "actionable, data-driven. Include sponsor names, trial phases, and statuses.\n\n"
+        "Be thorough but concise. Always state your reasoning before calling a tool.\n\n"
+        "OUTPUT FORMAT:\n"
+        "- When listing trials, include NCT links like https://clinicaltrials.gov/study/NCT04267848\n"
+        "- Use markdown tables for structured data (sponsor comparison, phase distribution)\n"
+        "- Highlight risky events with ⚠️ (terminated trials, failed phases, safety concerns)\n"
+        "- End with a brief 'BD Strategy Note' section when applicable\n"
+        "- Output in Chinese unless the user writes in English"
+    )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_query},
+    ]
+
+    tools = _build_tool_choice_list()
+    trace = []
+    consecutive_errors = 0  # 连续错误计数器，防止工具全挂时死循环
+
+    for turn in range(max_tool_rounds):
+        if verbose:
+            print(f"\n{'='*60}\n[Agent turn {turn+1}]\n{'='*60}")
+
+        # ── 流式调用 LLM ──
+        stream = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            tools=tools if tools else None,
+            tool_choice="auto" if tools else None,
+            temperature=0.2,
+            stream=True,  # 关键：开启流式
+        )
+
+        content_buf = ""          # 本轮累积文本
+        tool_calls_buf = []        # 本轮累积工具调用 [{id, name, args_str}]
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+
+            # 文本片段 → 实时推送
+            if delta.content:
+                content_buf += delta.content
+                yield {"type": "content", "text": delta.content}
+
+            # 工具调用增量（function calling 流式返回）
+            if delta.tool_calls:
+                for tc in delta.tool_calls:
+                    idx = tc.index if tc.index is not None else 0
+                    while len(tool_calls_buf) <= idx:
+                        tool_calls_buf.append({"id": "", "name": "", "args_str": ""})
+                    if tc.id:
+                        tool_calls_buf[idx]["id"] += tc.id
+                    if tc.function and tc.function.name:
+                        tool_calls_buf[idx]["name"] += tc.function.name
+                    if tc.function and tc.function.arguments:
+                        tool_calls_buf[idx]["args_str"] += tc.function.arguments
+
+        # ── 构造本轮 assistant 消息（OpenAI 需要完整 tool_calls）──
+        assistant_msg = {"role": "assistant", "content": content_buf or None}
+        if tool_calls_buf:
+            assistant_msg["tool_calls"] = [
+                {"id": t["id"], "type": "function",
+                 "function": {"name": t["name"], "arguments": t["args_str"]}}
+                for t in tool_calls_buf if t["name"]
+            ]
+        messages.append(assistant_msg)
+
+        # 没有工具调用 → 这就是最终答案，结束
+        if not tool_calls_buf or all(not t["name"] for t in tool_calls_buf):
+            yield {"type": "final", "text": content_buf, "trace": trace}
+            return
+
+        # ── 逐个执行工具调用 ──
+        for tc in tool_calls_buf:
+            if not tc["name"]:
+                continue
+            func_name = tc["name"]
+
+            # 解析参数 JSON（流式可能截断，做兜底）
+            try:
+                args = json.loads(tc["args_str"] or "{}")
+            except json.JSONDecodeError:
+                args = {}
+
+            # -- 参数清洗：LLM 有时会在参数值中混入换行、思考标签、多余空格 --
+            for key, val in args.items():
+                if isinstance(val, str):
+                    val = val.replace("<thinking>", "").replace("</thinking>", "")
+                    val = " ".join(val.split())
+                    args[key] = val.strip()
+                elif isinstance(val, list):
+                    cleaned = []
+                    for item in val:
+                        if isinstance(item, str):
+                            item = item.replace("<thinking>", "").replace("</thinking>", "")
+                            item = " ".join(item.split()).strip()
+                        cleaned.append(item)
+                    args[key] = cleaned
+
+            # 先通知前端「工具开始」（无论工具是否注册都展示，避免 UI 静默丢事件）
+            yield {"type": "tool_start", "tool": func_name,
+                   "args": {k: v for k, v in args.items() if k != "llm_client"}}
+
+            if func_name not in REGISTRY:
+                result = json.dumps({"error": f"Unknown tool: {func_name}"})
+                consecutive_errors += 1
+            else:
+                func, spec = REGISTRY[func_name]
+                # 为需要 LLM 客户端的工具注入 client
+                if func_name in ("analyze_eligibility", "analyze_competitive_landscape",
+                                 "compare_trials_side_by_side"):
+                    args["llm_client"] = client
+
+                if verbose:
+                    print(f"  → Calling: {func_name}({args})")
+
+                try:
+                    raw_result = func(**args)
+                    if isinstance(raw_result, dict) and "error" in raw_result:
+                        result = json.dumps(raw_result, ensure_ascii=False)[:8000]
+                        consecutive_errors += 1
+                    else:
+                        result = json.dumps(raw_result, ensure_ascii=False)[:8000]
+                        consecutive_errors = 0
+                except Exception as e:
+                    error_msg = str(e)
+                    if "401" in error_msg or "Unauthorized" in error_msg or "Authentication" in error_msg:
+                        friendly = "[凭证错误] API Key 无效或已过期，请在侧边栏检查 API Key 配置"
+                    elif "429" in error_msg or "Rate limit" in error_msg:
+                        friendly = "[限流] API 请求过于频繁，请稍后重试"
+                    elif "timeout" in error_msg.lower() or "timed out" in error_msg.lower():
+                        friendly = "[超时] 接口请求超时，可能是网络环境不稳定，请重试"
+                    else:
+                        friendly = f"[工具调用失败] {error_msg[:200]}"
+                    result = json.dumps({"error": friendly})
+                    consecutive_errors += 1
+
+            # 通知前端「工具完成」（已知/未知工具均在此抛出）
+            yield {"type": "tool_done", "tool": func_name, "preview": result[:300]}
+
+            # 连续 3 次工具调用都失败 → 提前终止
+            if consecutive_errors >= 3:
+                messages.append({
+                    "role": "user",
+                    "content": "[System note: Multiple tool calls failed. Please provide your best response based on available information.]",
+                })
+                # 兜底最终回复（流式输出）
+                fb_stream = client.chat.completions.create(
+                    model=model, messages=messages, temperature=0.2, stream=True)
+                fb_text = ""
+                for chunk in fb_stream:
+                    if chunk.choices and chunk.choices[0].delta.content:
+                        fb_text += chunk.choices[0].delta.content
+                        yield {"type": "content", "text": chunk.choices[0].delta.content}
+                yield {"type": "final",
+                       "text": fb_text or "All API calls failed. Unable to complete the analysis.",
+                       "trace": trace}
+                return
+
+            # 记录调用轨迹
+            trace_args = {k: v for k, v in args.items() if k != "llm_client"}
+            trace.append({
+                "turn": turn + 1,
+                "tool": func_name,
+                "arguments": trace_args,
+                "result_preview": result[:500],
+                "_full_result": result,
+            })
+
+            # 将工具执行结果追加到消息列表（供 LLM 下一轮使用）
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc["id"],
+                "content": result,
+            })
+
+    # 达到最大轮数仍未完成
+    yield {"type": "final", "text": "Agent reached maximum tool call rounds.", "trace": trace}
